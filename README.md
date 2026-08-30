@@ -1,8 +1,15 @@
 # Mau-Mau Manager
 
 Eine browserbasierte Verwaltung für eure Mau-Mau-Spielrunden im modernen
-Apple-Look. Läuft komplett client-seitig (kein Server, kein Build) – alle
-Daten bleiben lokal im Browser (`localStorage`).
+Apple-Look. Läuft komplett client-seitig (kein Server, kein Build).
+
+**Geteilte Daten über mehrere Geräte/Personen** gibt es nur in der
+Claude-Artifact-Version dieser App (dort synchronisiert jedes Speichern
+automatisch zu allen offenen Ansichten). Diese `index.html` hier – lokal
+geöffnet oder z. B. über GitHub Pages gehostet – speichert dagegen nur
+lokal im jeweiligen Browser (`localStorage`); mehrere Geräte sehen dabei
+**nicht** dieselben Daten. Die App erkennt selbst, ob sie innerhalb von
+claude.ai läuft, und schaltet den Sync-Teil automatisch an/aus.
 
 `index.html` einfach im Browser öffnen, um loszulegen.
 
@@ -58,8 +65,9 @@ Daten bleiben lokal im Browser (`localStorage`).
   Abhängigkeiten (Schriftart: reiner Systemfont-Stack `-apple-system` /
   `SF Pro`, dadurch echtes Apple-Rendering auf macOS/iOS und sinnvolle
   Fallbacks auf anderen Systemen).
-- Zustand (Spieler, Spieltage, Regelwerk) wird in `localStorage` gehalten
-  und bleibt bei einem erneuten Besuch erhalten.
+- Zustand (Spieler, Spieltage, Regelwerk) wird zusätzlich in `localStorage`
+  gehalten und bleibt bei einem erneuten Besuch erhalten (Offline-Fallback,
+  bzw. einziger Speicherort außerhalb von claude.ai).
 - Hell-/Dunkelmodus folgen automatisch der Systemeinstellung; über den
   Icon-Button oben rechts lässt sich auch manuell zwischen Hell, Dunkel und
   System umgeschaltet werden.

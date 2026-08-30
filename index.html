@@ -1,5 +1,4 @@
 <!doctype html>
-<!-- pages-build-trigger: 2026-08-30T15:21:25Z -->
 <html lang="de">
 <head>
 <meta charset="utf-8" />
@@ -144,6 +143,7 @@
   .sync-dot.sync-ok{ background:var(--green); }
   .sync-dot.sync-error{ background:var(--red); }
   .sync-dot.sync-offline{ background:var(--orange); }
+  .sync-dot.sync-readonly{ background:var(--purple); }
   @keyframes sync-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
 
   .tabbar{
@@ -433,12 +433,17 @@
 
   <main class="container">
     <div class="view" id="view"></div>
-    <footer class="credit">Alle Daten bleiben lokal in diesem Browser gespeichert.</footer>
+    <footer class="credit">Geteilte Daten – sichtbar für alle, die diese Seite öffnen.</footer>
   </main>
 </div>
 
 <div id="modalRoot"></div>
 <div class="toast" id="toast"></div>
+
+<!-- Geteilter Datenstand. Wird beim Speichern per Claude-Artifact-Publish neu
+     geschrieben, damit jede geöffnete Ansicht (jedes Gerät/jede Person) denselben
+     Stand sieht. Änderungen NIE hier von Hand eintragen. -->
+<script id="app-state" type="application/json">{"players":[],"matchdays":[],"rules":{"name":"GriKlö","scoring":"lower","mauPenalty":0,"items":["Bube auf Bube auflegen ist grundsätzlich nicht erlaubt.","Es ist immer eine passende Karte in der ausliegenden Farbe auszuspielen – oder ein weiteres Ass mit direkter Folgekarte in der Farbe. Andernfalls ist eine Karte zu ziehen.","Auf eine Acht kann eine weitere Acht gelegt werden."]}}</script>
 
 <script>
 (function(){
@@ -496,39 +501,51 @@
 
   var state = load();
   function load(){
+    // Geteilter Stand kommt aus dem #app-state-Marker (von Claude beim
+    // Publish neu geschrieben). localStorage ist nur ein Offline-Fallback,
+    // falls die Seite außerhalb von claude.ai geöffnet wird.
+    var d = defaultState();
+    try{
+      var el = document.getElementById("app-state");
+      if(el && el.textContent.trim()){
+        var parsed = JSON.parse(el.textContent);
+        return {
+          players: Array.isArray(parsed.players) ? parsed.players : [],
+          matchdays: Array.isArray(parsed.matchdays) ? parsed.matchdays : [],
+          rules: Object.assign({}, d.rules, parsed.rules || {})
+        };
+      }
+    }catch(e){}
     try{
       var raw = localStorage.getItem(STORAGE_KEY);
-      if(!raw) return defaultState();
-      var parsed = JSON.parse(raw);
-      var d = defaultState();
-      return {
-        players: Array.isArray(parsed.players) ? parsed.players : [],
-        matchdays: Array.isArray(parsed.matchdays) ? parsed.matchdays : [],
-        rules: Object.assign({}, d.rules, parsed.rules || {})
-      };
-    }catch(e){ return defaultState(); }
-  }
-  function applyRemoteState(remote){
-    var d = defaultState();
-    state.players = Array.isArray(remote.players) ? remote.players : [];
-    state.matchdays = Array.isArray(remote.matchdays) ? remote.matchdays : [];
-    state.rules = Object.assign({}, d.rules, remote.rules || {});
+      if(raw){
+        var p2 = JSON.parse(raw);
+        return {
+          players: Array.isArray(p2.players) ? p2.players : [],
+          matchdays: Array.isArray(p2.matchdays) ? p2.matchdays : [],
+          rules: Object.assign({}, d.rules, p2.rules || {})
+        };
+      }
+    }catch(e){}
+    return d;
   }
   function save(){
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
     syncToRemote();
   }
 
-  /* ============================ REMOTE SYNC (Vercel-API) ============================
-     Geteilte Daten laufen über eine kleine Server-Funktion (/api/state), die im
-     selben Vercel-Projekt wie diese Seite läuft (same-origin, kein CORS nötig,
-     kein Token im Client). Die Funktion selbst liest/schreibt eine data.json im
-     GitHub-Repo, mit einem GitHub-Token, das ausschließlich serverseitig als
-     Vercel-Umgebungsvariable liegt. */
-  var API_BASE = "/api/state";
-  var remoteEnabled = true;
+  /* ============================ REMOTE SYNC (Claude Artifact) ============================
+     Geteilte Daten laufen über die "artifact"-Runtime-Capability dieser Seite:
+     jedes Speichern publiziert die komplette Seite neu (mit aktuellem Stand im
+     #app-state-Marker), jede geöffnete Ansicht bei allen Mitspielern lädt
+     automatisch die neue Version. Außerhalb von claude.ai (z. B. lokal als
+     Datei geöffnet) gibt es kein window.claude – dann bleibt es bei rein
+     lokaler Speicherung (localStorage), ohne Fehler. */
+  var artifactNS = null;
+  var artifactChecked = false;
   var syncing = false;
   var pendingSync = false;
+  var writeBlocked = false;
   var syncStatusTimer = null;
 
   function setSyncStatus(s){
@@ -537,28 +554,35 @@
     clearTimeout(syncStatusTimer);
     el.className = "sync-dot sync-" + s;
     el.title = {
-      idle: "Geteilte Daten", syncing: "Synchronisiere…", ok: "Synchronisiert",
-      error: "Sync fehlgeschlagen – nur lokal gespeichert", offline: "Keine Verbindung zu den geteilten Daten"
+      idle: "Geteilte Daten – synchronisiert", syncing: "Synchronisiere…", ok: "Synchronisiert",
+      error: "Speichern fehlgeschlagen – nur lokal in diesem Browser", readonly: "Nur Lesezugriff auf die geteilten Daten",
+      offline: "Nur lokal in diesem Browser gespeichert (keine geteilten Daten verfügbar)"
     }[s] || "Geteilte Daten";
     if(s === "ok") syncStatusTimer = setTimeout(function(){ setSyncStatus("idle"); }, 2500);
   }
 
-  async function fetchRemoteState(){
-    var res = await fetch(API_BASE + "?_=" + Date.now(), { cache: "no-store" });
-    if(!res.ok) throw new Error("API GET " + res.status);
-    return await res.json();
+  async function initArtifact(){
+    try{
+      artifactNS = (window.claude && typeof window.claude.use === "function")
+        ? await window.claude.use("artifact")
+        : null;
+    }catch(e){ artifactNS = null; }
+    artifactChecked = true;
+    setSyncStatus(artifactNS ? "idle" : "offline");
   }
-  async function pushRemoteState(){
-    var res = await fetch(API_BASE, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ players: state.players, matchdays: state.matchdays, rules: state.rules })
-    });
-    if(res.status === 409){ var err = new Error("conflict"); err.conflict = true; throw err; }
-    if(!res.ok) throw new Error("API POST " + res.status);
+
+  async function buildPublishHtml(){
+    var res = await fetch(location.href, { cache: "no-store" });
+    if(!res.ok) throw new Error("Quelle konnte nicht geladen werden (" + res.status + ")");
+    var src = await res.text();
+    var json = JSON.stringify({ players: state.players, matchdays: state.matchdays, rules: state.rules });
+    var re = /(<script id="app-state" type="application\/json">)([\s\S]*?)(<\/script>)/;
+    if(!re.test(src)) throw new Error("app-state Marker nicht gefunden");
+    return src.replace(re, function(_, a, b, c){ return a + json + c; });
   }
+
   function syncToRemote(){
-    if(!remoteEnabled) return;
+    if(!artifactChecked || !artifactNS || writeBlocked) return;
     pendingSync = true;
     if(syncing) return;
     runSync();
@@ -566,49 +590,32 @@
   async function runSync(){
     syncing = true;
     setSyncStatus("syncing");
-    var attempts = 0;
     try{
-      while(pendingSync && attempts < 3){
-        pendingSync = false; attempts++;
-        try{
-          await pushRemoteState();
-        }catch(e){
-          if(e && e.conflict && attempts < 3){ pendingSync = true; continue; } // Server holt sich beim nächsten Versuch selbst den frischen Stand
-          throw e;
-        }
+      while(pendingSync){
+        pendingSync = false;
+        var html = await buildPublishHtml();
+        await artifactNS.publish(html); // Erfolg: diese Ansicht lädt automatisch neu
       }
       setSyncStatus("ok");
     }catch(err){
-      setSyncStatus("error");
-      toast("Sync fehlgeschlagen – nur lokal gespeichert");
+      var code = err && err.code;
+      if(code === "conflict"){
+        // Eine neuere Version wurde bereits publiziert – die Ansicht lädt
+        // automatisch dorthin neu, hier ist nichts weiter zu tun.
+        setSyncStatus("idle");
+      } else if(code === "not_writer" || code === "not_granted" || code === "consent_required"){
+        writeBlocked = true;
+        setSyncStatus("readonly");
+        toast("Nur Lesezugriff – Änderungen werden hier nicht gespeichert");
+      } else if(code === "not_declared" || code === "capability_disabled" || code === "capability_removed"){
+        artifactNS = null;
+        setSyncStatus("offline");
+      } else {
+        setSyncStatus("error");
+        toast("Speichern fehlgeschlagen" + (code ? " (" + code + ")" : "") + " – nur lokal gespeichert");
+      }
     }finally{
       syncing = false;
-    }
-  }
-  function stateFingerprint(s){
-    return JSON.stringify({ players: s.players, matchdays: s.matchdays, rules: s.rules });
-  }
-  async function pollRemote(){
-    if(!remoteEnabled || syncing || modalRoot.innerHTML) return;
-    try{
-      var remote = await fetchRemoteState();
-      if(stateFingerprint(remote) === stateFingerprint(state)) return;
-      applyRemoteState(remote);
-      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
-      renderTabbar(); renderView();
-      toast("Daten aktualisiert");
-    }catch(e){ /* offline/unerreichbar – letzten bekannten Stand behalten */ }
-  }
-  async function initRemote(){
-    setSyncStatus("syncing");
-    try{
-      var remote = await fetchRemoteState();
-      applyRemoteState(remote);
-      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
-      renderTabbar(); renderView();
-      setSyncStatus("ok");
-    }catch(e){
-      setSyncStatus("offline");
     }
   }
 
@@ -1313,9 +1320,7 @@
   /* ============================ INIT ============================ */
   renderTabbar();
   renderView();
-  initRemote();
-  setInterval(pollRemote, 20000);
-  document.addEventListener("visibilitychange", function(){ if(!document.hidden) pollRemote(); });
+  initArtifact();
 })();
 </script>
 </body>

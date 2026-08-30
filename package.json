@@ -1,9 +1,0 @@
-{
-  "name": "mau-mau-manager",
-  "private": true,
-  "version": "1.0.0",
-  "description": "Mau-Mau Manager – statische Web-App plus /api/state Serverless-Funktion für geteilte Daten.",
-  "engines": {
-    "node": "20.x"
-  }
-}
