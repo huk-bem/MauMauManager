@@ -519,40 +519,18 @@
     syncToRemote();
   }
 
-  /* ============================ REMOTE SYNC (GitHub) ============================
-     Speichert eine gemeinsame data.json direkt im GitHub-Repo, damit alle Geräte
-     dieselben Daten sehen. Schreibzugriff läuft über ein Fine-grained Personal
-     Access Token, das NUR "Contents: Read and write" für genau dieses eine Repo
-     erlaubt (kein Zugriff auf andere Repos/den Account). Das Token liegt bewusst
-     offen im Client-Code, weil es keinen Server/Proxy gibt – der Schaden im
-     schlimmsten Fall bleibt auf diese eine data.json-Datei begrenzt. */
-  var GH_OWNER = "huk-bem";
-  var GH_REPO = "MauMauManager";
-  var GH_BRANCH = "main";
-  var GH_PATH = "data.json";
-  var GH_TOKEN = ""; // Fine-grained PAT (Contents: Read & write, nur dieses Repo) hier einfügen
-  var GH_API = "https://api.github.com/repos/"+GH_OWNER+"/"+GH_REPO+"/contents/"+GH_PATH;
-  var remoteEnabled = !!GH_TOKEN;
-  var remoteSha = null;
+  /* ============================ REMOTE SYNC (Vercel-API) ============================
+     Geteilte Daten laufen über eine kleine Server-Funktion (/api/state), die im
+     selben Vercel-Projekt wie diese Seite läuft (same-origin, kein CORS nötig,
+     kein Token im Client). Die Funktion selbst liest/schreibt eine data.json im
+     GitHub-Repo, mit einem GitHub-Token, das ausschließlich serverseitig als
+     Vercel-Umgebungsvariable liegt. */
+  var API_BASE = "/api/state";
+  var remoteEnabled = true;
   var syncing = false;
   var pendingSync = false;
   var syncStatusTimer = null;
 
-  function b64EncodeUnicode(str){
-    return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function(_, p1){
-      return String.fromCharCode(parseInt(p1, 16));
-    }));
-  }
-  function b64DecodeUnicode(str){
-    return decodeURIComponent(atob(str).split("").map(function(c){
-      return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
-    }).join(""));
-  }
-  function ghHeaders(){
-    var h = { "Accept": "application/vnd.github+json" };
-    if(GH_TOKEN) h["Authorization"] = "Bearer " + GH_TOKEN;
-    return h;
-  }
   function setSyncStatus(s){
     var el = document.getElementById("syncStatus");
     if(!el) return;
@@ -566,30 +544,18 @@
   }
 
   async function fetchRemoteState(){
-    var res = await fetch(GH_API + "?ref=" + GH_BRANCH + "&_=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
-    if(res.status === 404){ remoteSha = null; return null; }
-    if(!res.ok) throw new Error("GitHub GET " + res.status);
-    var json = await res.json();
-    remoteSha = json.sha;
-    return JSON.parse(b64DecodeUnicode(json.content.replace(/\n/g, "")));
-  }
-  async function refreshShaOnly(){
-    var res = await fetch(GH_API + "?ref=" + GH_BRANCH + "&_=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
-    if(res.ok){ var j = await res.json(); remoteSha = j.sha; }
-    else if(res.status === 404){ remoteSha = null; }
+    var res = await fetch(API_BASE + "?_=" + Date.now(), { cache: "no-store" });
+    if(!res.ok) throw new Error("API GET " + res.status);
+    return await res.json();
   }
   async function pushRemoteState(){
-    var body = {
-      message: "Mau-Mau-Daten aktualisiert – " + new Date().toISOString(),
-      content: b64EncodeUnicode(JSON.stringify({ players: state.players, matchdays: state.matchdays, rules: state.rules }, null, 2)),
-      branch: GH_BRANCH
-    };
-    if(remoteSha) body.sha = remoteSha;
-    var res = await fetch(GH_API, { method: "PUT", headers: Object.assign({ "Content-Type": "application/json" }, ghHeaders()), body: JSON.stringify(body) });
+    var res = await fetch(API_BASE, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ players: state.players, matchdays: state.matchdays, rules: state.rules })
+    });
     if(res.status === 409){ var err = new Error("conflict"); err.conflict = true; throw err; }
-    if(!res.ok) throw new Error("GitHub PUT " + res.status);
-    var json = await res.json();
-    remoteSha = json.content.sha;
+    if(!res.ok) throw new Error("API POST " + res.status);
   }
   function syncToRemote(){
     if(!remoteEnabled) return;
@@ -607,11 +573,7 @@
         try{
           await pushRemoteState();
         }catch(e){
-          if(e && e.conflict && attempts < 3){
-            await refreshShaOnly();
-            pendingSync = true;
-            continue;
-          }
+          if(e && e.conflict && attempts < 3){ pendingSync = true; continue; } // Server holt sich beim nächsten Versuch selbst den frischen Stand
           throw e;
         }
       }
@@ -623,34 +585,28 @@
       syncing = false;
     }
   }
+  function stateFingerprint(s){
+    return JSON.stringify({ players: s.players, matchdays: s.matchdays, rules: s.rules });
+  }
   async function pollRemote(){
     if(!remoteEnabled || syncing || modalRoot.innerHTML) return;
     try{
-      var res = await fetch(GH_API + "?ref=" + GH_BRANCH + "&_=" + Date.now(), { headers: ghHeaders(), cache: "no-store" });
-      if(!res.ok) return;
-      var json = await res.json();
-      if(json.sha === remoteSha) return;
-      remoteSha = json.sha;
-      var remote = JSON.parse(b64DecodeUnicode(json.content.replace(/\n/g, "")));
+      var remote = await fetchRemoteState();
+      if(stateFingerprint(remote) === stateFingerprint(state)) return;
       applyRemoteState(remote);
       try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
       renderTabbar(); renderView();
       toast("Daten aktualisiert");
-    }catch(e){ /* still offline or unreachable – keep last known state */ }
+    }catch(e){ /* offline/unerreichbar – letzten bekannten Stand behalten */ }
   }
   async function initRemote(){
-    if(!remoteEnabled) return;
     setSyncStatus("syncing");
     try{
       var remote = await fetchRemoteState();
-      if(remote){
-        applyRemoteState(remote);
-        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
-        renderTabbar(); renderView();
-        setSyncStatus("ok");
-      } else {
-        syncToRemote(); // data.json existiert noch nicht im Repo – mit aktuellem Stand anlegen
-      }
+      applyRemoteState(remote);
+      try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+      renderTabbar(); renderView();
+      setSyncStatus("ok");
     }catch(e){
       setSyncStatus("offline");
     }
