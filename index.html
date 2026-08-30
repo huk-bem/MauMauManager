@@ -91,7 +91,7 @@
   *,*::before,*::after{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html{ -webkit-text-size-adjust:100%; }
   body{
-    margin:0; background:var(--bg); color:var(--label);
+    margin:0; background:var(--bg); color:var(--label); overflow-x:hidden;
     font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     font-size:15.5px; line-height:1.45; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
   }
@@ -274,7 +274,8 @@
   .md-head .chev.open{ transform:rotate(180deg); }
   .md-actions{ display:flex; gap:6px; flex:none; }
   .md-body{ border-top:1px solid var(--sep); padding:6px 16px 14px; }
-  .md-table{ width:100%; border-collapse:collapse; font-size:.86rem; }
+  .md-table-wrap{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .md-table{ width:100%; min-width:340px; border-collapse:collapse; font-size:.86rem; }
   .md-table th{ text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; color:var(--label-3); font-weight:700; padding:10px 8px 6px; }
   .md-table td{ padding:8px; border-top:1px solid var(--sep); }
   .md-table tr td:first-child, .md-table th:first-child{ padding-left:2px; }
@@ -314,14 +315,25 @@
   .stepper button:active{ background:var(--sep); }
   .stepper .val{ min-width:26px; text-align:center; font-weight:700; font-size:.86rem; }
 
-  .participant-row{ display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--sep); }
-  .participant-row:last-child{ border-bottom:none; }
-  .participant-row .who{ flex:1; display:flex; align-items:center; gap:10px; min-width:0; }
-  .participant-row .who .name{ font-weight:600; font-size:.88rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .toggle-in{ width:22px; height:22px; border-radius:7px; border:1.5px solid var(--sep-strong); flex:none; cursor:pointer; display:flex; align-items:center; justify-content:center; background:var(--bg-elev); }
+  .participant-row{
+    display:flex; flex-direction:column; gap:10px; padding:12px; margin-bottom:8px;
+    border-radius:var(--radius-sm); background:var(--card-2); border:1px solid transparent;
+    border-left:3px solid var(--row-color, var(--sep-strong)); transition:opacity .15s ease;
+  }
+  .participant-row:last-child{ margin-bottom:0; }
+  .participant-row.off{ opacity:.5; }
+  .participant-row .who{ display:flex; align-items:center; gap:10px; min-width:0; }
+  .participant-row .who .name{ flex:1; min-width:0; font-weight:600; font-size:.9rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .toggle-in{ width:24px; height:24px; border-radius:7px; border:1.5px solid var(--sep-strong); flex:none; cursor:pointer; display:flex; align-items:center; justify-content:center; background:var(--bg-elev); }
   .toggle-in.on{ background:var(--blue); border-color:var(--blue); color:#fff; }
-  .toggle-in svg{ width:13px; height:13px; }
-  .pts-input{ width:64px; padding:7px 6px; text-align:center; border-radius:8px; border:1px solid var(--sep-strong); background:var(--bg-elev); color:var(--label); font-weight:700; font-size:.86rem; }
+  .toggle-in svg{ width:14px; height:14px; }
+  .not-in-badge{ font-size:.72rem; font-weight:700; color:var(--label-3); flex:none; }
+  .participant-controls{ display:flex; gap:10px; padding-left:34px; }
+  .mini-field{ display:flex; flex-direction:column; gap:5px; }
+  .mini-field.grow{ flex:1; }
+  .mini-field .mini-label{ font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--label-3); }
+  .pts-input{ width:100%; padding:7px 6px; text-align:center; border-radius:8px; border:1px solid var(--sep-strong); background:var(--bg-elev); color:var(--label); font-weight:700; font-size:.86rem; }
+  .participant-row.off .pts-input, .participant-row.off .stepper{ pointer-events:none; }
 
   /* ---------- rules ---------- */
   .rule-row{ display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--sep); }
@@ -790,7 +802,7 @@
           if(!entries.length){
             html += '<div class="md-note">Keine Punkte erfasst.</div>';
           } else {
-            html += '<table class="md-table"><thead><tr><th>Spieler</th><th>Punkte</th><th>Mau-Verstöße</th><th></th></tr></thead><tbody>';
+            html += '<div class="md-table-wrap"><table class="md-table"><thead><tr><th>Spieler</th><th>Punkte</th><th>Mau-Verstöße</th><th></th></tr></thead><tbody>';
             entries.forEach(function(e){
               var p = playerById(e.playerId);
               if(!p) return;
@@ -801,7 +813,7 @@
                 '<td>'+(isWinner ? '<span class="chip win">'+ICONS.crown+'Sieg</span>' : '')+'</td>'+
               '</tr>';
             });
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
           }
           html += '</div>';
         }
@@ -1038,15 +1050,22 @@
       var included = editing ? !!e : true;
       var pts = e ? e.points : 0;
       var mau = e ? (e.mauViolations||0) : 0;
-      return '<div class="participant-row" data-player="'+p.id+'">'+
-        '<div class="who"><button type="button" class="toggle-in'+(included?" on":"")+'" data-action="toggle-participant" data-id="'+p.id+'">'+(included?ICONS.check:'')+'</button>'+
+      return '<div class="participant-row'+(included?"":" off")+'" data-player="'+p.id+'" style="--row-color:'+p.color+'">'+
+        '<div class="who">'+
+          '<button type="button" class="toggle-in'+(included?" on":"")+'" data-action="toggle-participant" data-id="'+p.id+'" title="Nimmt an diesem Spieltag teil" aria-label="Teilnahme von '+esc(fullName(p))+'">'+(included?ICONS.check:'')+'</button>'+
           '<div class="avatar sm" style="background:'+p.color+'">'+esc(initials(p))+'</div>'+
-          '<div class="name">'+esc(fullName(p))+'</div></div>'+
-        '<input type="number" class="pts-input" data-pts="'+p.id+'" value="'+pts+'" step="1" title="Punkte" />'+
-        '<div class="stepper" data-mau="'+p.id+'">'+
-          '<button type="button" data-action="mau-dec" data-id="'+p.id+'">'+ICONS.minus+'</button>'+
-          '<span class="val" id="mauVal-'+p.id+'">'+mau+'</span>'+
-          '<button type="button" data-action="mau-inc" data-id="'+p.id+'">'+ICONS.plus+'</button>'+
+          '<div class="name">'+esc(fullName(p))+'</div>'+
+          '<div class="not-in-badge" id="notin-'+p.id+'">'+(included?'':'nimmt nicht teil')+'</div>'+
+        '</div>'+
+        '<div class="participant-controls">'+
+          '<div class="mini-field grow"><span class="mini-label">Punkte</span>'+
+            '<input type="number" class="pts-input" data-pts="'+p.id+'" value="'+pts+'" step="1" '+(included?'':'tabindex="-1"')+' aria-label="Punkte für '+esc(fullName(p))+'" /></div>'+
+          '<div class="mini-field"><span class="mini-label">Mau-Verstöße</span>'+
+            '<div class="stepper" data-mau="'+p.id+'">'+
+              '<button type="button" data-action="mau-dec" data-id="'+p.id+'" '+(included?'':'tabindex="-1"')+' aria-label="Mau-Verstöße verringern">'+ICONS.minus+'</button>'+
+              '<span class="val" id="mauVal-'+p.id+'">'+mau+'</span>'+
+              '<button type="button" data-action="mau-inc" data-id="'+p.id+'" '+(included?'':'tabindex="-1"')+' aria-label="Mau-Verstöße erhöhen">'+ICONS.plus+'</button>'+
+            '</div></div>'+
         '</div>'+
       '</div>';
     }).join("");
@@ -1058,7 +1077,7 @@
       '</div>'+
       '<div class="field"><label>Notiz (optional)</label><input type="text" id="mdNote" value="'+esc(editing?editing.note||"":"")+'" placeholder="z. B. Ort oder Anlass" /></div>'+
       '<div class="field"><label>Teilnehmer &amp; Punkte</label>'+
-        '<div class="hint" style="margin:-2px 0 10px">Häkchen = nimmt teil. Mau-Verstöße sind optional.</div>'+
+        '<div class="hint" style="margin:-2px 0 10px">Häkchen anklicken, um einen Spieler ab-/anzumelden. Punkte und Mau-Verstöße gehören jeweils zur Zeile direkt darüber; abgemeldete Spieler (ausgegraut) zählen nicht mit.</div>'+
         '<div id="participants">'+rowsHtml+'</div>'+
       '</div>'+
     '</form>';
@@ -1068,8 +1087,13 @@
 
     document.querySelectorAll('[data-action="toggle-participant"]').forEach(function(btn){
       btn.addEventListener("click", function(){
-        btn.classList.toggle("on");
-        btn.innerHTML = btn.classList.contains("on") ? ICONS.check : "";
+        var id = btn.getAttribute("data-id");
+        var on = btn.classList.toggle("on");
+        btn.innerHTML = on ? ICONS.check : "";
+        var row = btn.closest(".participant-row");
+        row.classList.toggle("off", !on);
+        var badge = document.getElementById("notin-"+id);
+        if(badge) badge.textContent = on ? "" : "nimmt nicht teil";
       });
     });
     document.querySelectorAll('[data-action="mau-inc"]').forEach(function(btn){
