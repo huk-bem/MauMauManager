@@ -1,0 +1,14 @@
+{
+  "players": [],
+  "matchdays": [],
+  "rules": {
+    "name": "GriKlö",
+    "scoring": "lower",
+    "mauPenalty": 0,
+    "items": [
+      "Bube auf Bube auflegen ist grundsätzlich nicht erlaubt.",
+      "Es ist immer eine passende Karte in der ausliegenden Farbe auszuspielen – oder ein weiteres Ass mit direkter Folgekarte in der Farbe. Andernfalls ist eine Karte zu ziehen.",
+      "Auf eine Acht kann eine weitere Acht gelegt werden."
+    ]
+  }
+}
