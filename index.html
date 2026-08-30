@@ -1,0 +1,1186 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Mau-Mau Manager</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Spieler, Punktestände und Ranking für eure Mau-Mau-Runden – inklusive individuellem Regelwerk." />
+<style>
+  :root{
+    color-scheme: light;
+    --bg:#F2F2F7;
+    --bg-elev:#FAFAFC;
+    --card:#FFFFFF;
+    --card-2:#F7F7F9;
+    --label:#1C1C1E;
+    --label-2:rgba(60,60,67,.62);
+    --label-3:rgba(60,60,67,.4);
+    --sep:rgba(60,60,67,.16);
+    --sep-strong:rgba(60,60,67,.29);
+    --blue:#007AFF;
+    --blue-ink:#FFFFFF;
+    --green:#34C759;
+    --red:#FF3B30;
+    --orange:#FF9500;
+    --yellow:#FFCC00;
+    --purple:#AF52DE;
+    --gold:#C99A2E;
+    --silver:#9AA0A6;
+    --bronze:#B4763B;
+    --shadow-1:0 1px 2px rgba(28,28,30,.06), 0 1px 1px rgba(28,28,30,.04);
+    --shadow-2:0 12px 28px rgba(28,28,30,.14), 0 2px 8px rgba(28,28,30,.08);
+    --radius-lg:20px;
+    --radius-md:14px;
+    --radius-sm:10px;
+    --nav-blur: saturate(180%) blur(20px);
+    --nav-bg: rgba(242,242,247,.78);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --bg:#000000;
+      --bg-elev:#0B0B0D;
+      --card:#1C1C1E;
+      --card-2:#242426;
+      --label:#F5F5F7;
+      --label-2:rgba(235,235,245,.6);
+      --label-3:rgba(235,235,245,.38);
+      --sep:rgba(84,84,88,.5);
+      --sep-strong:rgba(84,84,88,.65);
+      --blue:#0A84FF;
+      --blue-ink:#FFFFFF;
+      --green:#30D158;
+      --red:#FF453A;
+      --orange:#FF9F0A;
+      --yellow:#FFD60A;
+      --purple:#BF5AF2;
+      --gold:#E0B84A;
+      --silver:#B7BCC2;
+      --bronze:#C98A55;
+      --shadow-1:0 1px 2px rgba(0,0,0,.5), 0 1px 1px rgba(0,0,0,.3);
+      --shadow-2:0 16px 36px rgba(0,0,0,.55), 0 2px 10px rgba(0,0,0,.4);
+      --nav-bg: rgba(0,0,0,.66);
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --bg:#000000;
+    --bg-elev:#0B0B0D;
+    --card:#1C1C1E;
+    --card-2:#242426;
+    --label:#F5F5F7;
+    --label-2:rgba(235,235,245,.6);
+    --label-3:rgba(235,235,245,.38);
+    --sep:rgba(84,84,88,.5);
+    --sep-strong:rgba(84,84,88,.65);
+    --blue:#0A84FF;
+    --blue-ink:#FFFFFF;
+    --green:#30D158;
+    --red:#FF453A;
+    --orange:#FF9F0A;
+    --yellow:#FFD60A;
+    --purple:#BF5AF2;
+    --gold:#E0B84A;
+    --silver:#B7BCC2;
+    --bronze:#C98A55;
+    --shadow-1:0 1px 2px rgba(0,0,0,.5), 0 1px 1px rgba(0,0,0,.3);
+    --shadow-2:0 16px 36px rgba(0,0,0,.55), 0 2px 10px rgba(0,0,0,.4);
+    --nav-bg: rgba(0,0,0,.66);
+  }
+
+  *,*::before,*::after{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0; background:var(--bg); color:var(--label);
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    font-size:15.5px; line-height:1.45; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:.001ms !important; transition-duration:.001ms !important; }
+  }
+  h1,h2,h3,h4{ margin:0; font-weight:700; letter-spacing:-.01em; }
+  p{ margin:0; }
+  button{ font-family:inherit; }
+  input,select,textarea{ font-family:inherit; color:inherit; }
+  a{ color:var(--blue); }
+  ::selection{ background:rgba(0,122,255,.25); }
+
+  /* ---------- layout shell ---------- */
+  .app{ min-height:100vh; display:flex; flex-direction:column; }
+
+  .navbar{
+    position:sticky; top:0; z-index:30;
+    background:var(--nav-bg); -webkit-backdrop-filter:var(--nav-blur); backdrop-filter:var(--nav-blur);
+    border-bottom:1px solid var(--sep);
+  }
+  .navbar-inner{
+    max-width:860px; margin:0 auto; padding:14px 20px 10px;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; min-width:0; }
+  .brand-mark{
+    width:38px; height:38px; border-radius:11px; flex:none;
+    background:linear-gradient(150deg, var(--blue), var(--purple));
+    display:flex; align-items:center; justify-content:center; color:#fff;
+    box-shadow:var(--shadow-1);
+  }
+  .brand-mark svg{ width:20px; height:20px; }
+  .brand-text{ min-width:0; }
+  .brand h1{ font-size:1.18rem; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .brand .tag{ color:var(--label-2); font-size:.8rem; margin-top:1px; }
+  .navbar-right{ display:flex; align-items:center; gap:8px; flex:none; }
+
+  .icon-btn{
+    width:36px; height:36px; border-radius:50%; border:none; cursor:pointer;
+    background:var(--card-2); color:var(--label); display:flex; align-items:center; justify-content:center;
+    transition:transform .15s ease, background .15s ease;
+  }
+  .icon-btn:active{ transform:scale(.9); }
+  .icon-btn svg{ width:18px; height:18px; }
+
+  .tabbar{
+    max-width:860px; margin:0 auto; padding:2px 20px 12px;
+    display:flex; gap:2px; overflow-x:auto; scrollbar-width:none;
+  }
+  .tabbar::-webkit-scrollbar{ display:none; }
+  .tabbar-track{
+    display:flex; gap:2px; background:var(--card-2); padding:3px; border-radius:12px; width:100%;
+  }
+  .tab{
+    flex:1 1 0; white-space:nowrap; padding:8px 10px; border:none; background:transparent; border-radius:9px;
+    color:var(--label-2); font-size:.86rem; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+    transition:background .18s ease, color .18s ease, box-shadow .18s ease;
+  }
+  .tab svg{ width:15px; height:15px; flex:none; }
+  .tab.active{ background:var(--card); color:var(--label); box-shadow:var(--shadow-1); }
+  .tab:not(.active):hover{ color:var(--label); }
+
+  .container{ flex:1; max-width:860px; margin:0 auto; padding:18px 20px 64px; width:100%; }
+  .view{ animation:fadein .22s ease; }
+  @keyframes fadein{ from{ opacity:0; transform:translateY(4px);} to{ opacity:1; transform:none; } }
+
+  .section-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin:26px 0 10px; }
+  .section-head:first-child{ margin-top:2px; }
+  .section-head h2{ font-size:1.28rem; }
+  .section-sub{ color:var(--label-2); font-size:.88rem; margin-top:2px; }
+
+  /* ---------- buttons ---------- */
+  .btn{
+    appearance:none; border:none; cursor:pointer; border-radius:980px; padding:9px 16px;
+    font-size:.88rem; font-weight:600; display:inline-flex; align-items:center; gap:6px;
+    transition:transform .12s ease, opacity .15s ease, background .15s ease;
+  }
+  .btn svg{ width:15px; height:15px; }
+  .btn:active{ transform:scale(.96); }
+  .btn-primary{ background:var(--blue); color:#fff; }
+  .btn-primary:hover{ opacity:.92; }
+  .btn-secondary{ background:var(--card-2); color:var(--label); }
+  .btn-secondary:hover{ background:var(--sep); }
+  .btn-destructive{ background:transparent; color:var(--red); }
+  .btn-destructive:hover{ background:rgba(255,59,48,.1); }
+  .btn-block{ width:100%; justify-content:center; }
+  .btn-sm{ padding:6px 12px; font-size:.8rem; }
+  .btn:disabled{ opacity:.4; cursor:not-allowed; }
+
+  /* ---------- cards / lists ---------- */
+  .card{
+    background:var(--card); border-radius:var(--radius-lg); box-shadow:var(--shadow-1);
+    border:1px solid var(--sep); overflow:hidden;
+  }
+  .card + .card{ margin-top:12px; }
+  .pad{ padding:16px; }
+
+  .list{ display:flex; flex-direction:column; }
+  .list-row{
+    display:flex; align-items:center; gap:12px; padding:13px 16px;
+    border-bottom:1px solid var(--sep);
+  }
+  .list-row:last-child{ border-bottom:none; }
+
+  .empty{
+    text-align:center; padding:44px 20px; color:var(--label-2);
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+  }
+  .empty .empty-icon{
+    width:56px; height:56px; border-radius:50%; background:var(--card-2);
+    display:flex; align-items:center; justify-content:center; color:var(--label-3);
+  }
+  .empty .empty-icon svg{ width:26px; height:26px; }
+  .empty strong{ color:var(--label); font-size:1rem; }
+
+  /* ---------- avatars ---------- */
+  .avatar{
+    width:42px; height:42px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
+    color:#fff; font-weight:700; font-size:.86rem; letter-spacing:.02em; box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);
+  }
+  .avatar.sm{ width:32px; height:32px; font-size:.72rem; }
+  .avatar.lg{ width:64px; height:64px; font-size:1.15rem; }
+
+  /* ---------- podium / ranking ---------- */
+  .podium{ display:flex; align-items:flex-end; gap:10px; margin-bottom:16px; }
+  .podium-slot{ flex:1; display:flex; flex-direction:column; align-items:center; gap:8px; }
+  .podium-slot .crown{ color:var(--gold); width:22px; height:22px; }
+  .podium-name{ font-weight:700; font-size:.86rem; text-align:center; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .podium-score{ font-size:.78rem; color:var(--label-2); }
+  .podium-bar{
+    width:100%; border-radius:14px 14px 0 0; display:flex; align-items:flex-start; justify-content:center; padding-top:8px;
+    box-shadow:var(--shadow-1);
+  }
+  .podium-rank{ font-weight:800; font-size:1.1rem; color:#fff; }
+  .podium-slot.rank-1 .podium-bar{ height:104px; background:linear-gradient(160deg, var(--gold), #a97f1d); }
+  .podium-slot.rank-2 .podium-bar{ height:78px; background:linear-gradient(160deg, var(--silver), #767b81); }
+  .podium-slot.rank-3 .podium-bar{ height:60px; background:linear-gradient(160deg, var(--bronze), #8a5527); }
+
+  .rank-row{ display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--sep); }
+  .rank-row:last-child{ border-bottom:none; }
+  .rank-num{ width:22px; text-align:center; font-weight:700; color:var(--label-3); font-size:.86rem; flex:none; }
+  .rank-info{ flex:1; min-width:0; }
+  .rank-info .name{ font-weight:600; font-size:.94rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rank-info .meta{ font-size:.78rem; color:var(--label-2); margin-top:1px; }
+  .rank-score{ text-align:right; flex:none; }
+  .rank-score .val{ font-weight:800; font-size:1.02rem; }
+  .rank-score .lbl{ font-size:.72rem; color:var(--label-2); }
+
+  /* ---------- chips / badges ---------- */
+  .chip{
+    display:inline-flex; align-items:center; gap:4px; padding:3px 9px; border-radius:980px;
+    font-size:.72rem; font-weight:700; background:var(--card-2); color:var(--label-2);
+  }
+  .chip.win{ background:rgba(52,199,89,.15); color:var(--green); }
+  .chip.mau{ background:rgba(255,149,0,.15); color:var(--orange); }
+  .chip svg{ width:11px; height:11px; }
+
+  /* ---------- players grid ---------- */
+  .players-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:12px; }
+  .player-card{
+    background:var(--card); border-radius:var(--radius-md); border:1px solid var(--sep); box-shadow:var(--shadow-1);
+    padding:16px; display:flex; flex-direction:column; gap:10px;
+  }
+  .player-card-top{ display:flex; align-items:center; gap:12px; }
+  .player-card .name{ font-weight:700; font-size:.98rem; }
+  .player-card .sub{ font-size:.78rem; color:var(--label-2); }
+  .player-stats{ display:flex; gap:14px; }
+  .player-stats div{ font-size:.78rem; color:var(--label-2); }
+  .player-stats strong{ display:block; color:var(--label); font-size:.98rem; font-weight:700; }
+  .player-card-actions{ display:flex; gap:8px; margin-top:2px; }
+
+  /* ---------- matchdays ---------- */
+  .md-card{ background:var(--card); border-radius:var(--radius-md); border:1px solid var(--sep); box-shadow:var(--shadow-1); }
+  .md-head{ display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer; }
+  .md-date{ flex:1; min-width:0; }
+  .md-date .d{ font-weight:700; font-size:.94rem; }
+  .md-date .t{ font-size:.78rem; color:var(--label-2); margin-top:1px; }
+  .md-head .chev{ width:16px; height:16px; color:var(--label-3); transition:transform .2s ease; flex:none; }
+  .md-head .chev.open{ transform:rotate(180deg); }
+  .md-actions{ display:flex; gap:6px; flex:none; }
+  .md-body{ border-top:1px solid var(--sep); padding:6px 16px 14px; }
+  .md-table{ width:100%; border-collapse:collapse; font-size:.86rem; }
+  .md-table th{ text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; color:var(--label-3); font-weight:700; padding:10px 8px 6px; }
+  .md-table td{ padding:8px; border-top:1px solid var(--sep); }
+  .md-table tr td:first-child, .md-table th:first-child{ padding-left:2px; }
+  .md-player{ display:flex; align-items:center; gap:8px; }
+  .md-note{ padding:10px 2px 2px; color:var(--label-2); font-size:.82rem; font-style:italic; }
+
+  /* ---------- forms ---------- */
+  .field{ margin-bottom:14px; }
+  .field label{ display:block; font-size:.78rem; font-weight:700; color:var(--label-2); margin-bottom:6px; text-transform:uppercase; letter-spacing:.02em; }
+  .field input[type=text], .field input[type=number], .field input[type=date], .field input[type=time], .field textarea, .field select{
+    width:100%; padding:10px 12px; border-radius:var(--radius-sm); border:1px solid var(--sep-strong); background:var(--bg-elev);
+    color:var(--label); font-size:.92rem; outline:none; transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus{ border-color:var(--blue); box-shadow:0 0 0 3px rgba(10,132,255,.18); }
+  .field-row{ display:flex; gap:10px; }
+  .field-row .field{ flex:1; }
+  .hint{ font-size:.76rem; color:var(--label-3); margin-top:6px; }
+
+  .swatches{ display:flex; flex-wrap:wrap; gap:8px; }
+  .swatch{
+    width:30px; height:30px; border-radius:50%; border:2px solid transparent; cursor:pointer; position:relative;
+  }
+  .swatch.selected{ border-color:var(--label); box-shadow:0 0 0 2px var(--card); }
+  .swatch.selected::after{
+    content:""; position:absolute; inset:0; border-radius:50%; box-shadow:inset 0 0 0 2px #fff;
+  }
+
+  .seg{ display:flex; background:var(--card-2); border-radius:10px; padding:3px; gap:2px; }
+  .seg button{
+    flex:1; border:none; background:transparent; padding:8px 10px; border-radius:7px; cursor:pointer;
+    font-size:.82rem; font-weight:600; color:var(--label-2); transition:background .15s ease, color .15s ease;
+  }
+  .seg button.active{ background:var(--card); color:var(--label); box-shadow:var(--shadow-1); }
+
+  .stepper{ display:flex; align-items:center; gap:0; background:var(--bg-elev); border:1px solid var(--sep-strong); border-radius:var(--radius-sm); overflow:hidden; width:fit-content; }
+  .stepper button{ width:32px; height:32px; border:none; background:transparent; cursor:pointer; color:var(--blue); font-size:1.05rem; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .stepper button:active{ background:var(--sep); }
+  .stepper .val{ min-width:26px; text-align:center; font-weight:700; font-size:.86rem; }
+
+  .participant-row{ display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--sep); }
+  .participant-row:last-child{ border-bottom:none; }
+  .participant-row .who{ flex:1; display:flex; align-items:center; gap:10px; min-width:0; }
+  .participant-row .who .name{ font-weight:600; font-size:.88rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .toggle-in{ width:22px; height:22px; border-radius:7px; border:1.5px solid var(--sep-strong); flex:none; cursor:pointer; display:flex; align-items:center; justify-content:center; background:var(--bg-elev); }
+  .toggle-in.on{ background:var(--blue); border-color:var(--blue); color:#fff; }
+  .toggle-in svg{ width:13px; height:13px; }
+  .pts-input{ width:64px; padding:7px 6px; text-align:center; border-radius:8px; border:1px solid var(--sep-strong); background:var(--bg-elev); color:var(--label); font-weight:700; font-size:.86rem; }
+
+  /* ---------- rules ---------- */
+  .rule-row{ display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--sep); }
+  .rule-row:last-child{ border-bottom:none; }
+  .rule-num{ width:22px; height:22px; border-radius:50%; background:var(--card-2); color:var(--label-2); font-size:.72rem; font-weight:800; flex:none; display:flex; align-items:center; justify-content:center; margin-top:4px; }
+  .rule-row textarea{ flex:1; resize:vertical; min-height:44px; }
+
+  /* ---------- stats bars ---------- */
+  .bar-row{ display:flex; align-items:center; gap:10px; padding:8px 0; }
+  .bar-row .who{ width:108px; flex:none; font-size:.82rem; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bar-track{ flex:1; height:10px; border-radius:6px; background:var(--card-2); overflow:hidden; }
+  .bar-fill{ height:100%; border-radius:6px; transition:width .4s ease; }
+  .bar-val{ width:44px; flex:none; text-align:right; font-size:.8rem; font-weight:700; color:var(--label-2); }
+
+  .stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:6px; }
+  .stat-tile{ background:var(--card-2); border-radius:var(--radius-sm); padding:12px; }
+  .stat-tile .n{ font-size:1.3rem; font-weight:800; }
+  .stat-tile .l{ font-size:.72rem; color:var(--label-2); font-weight:600; margin-top:2px; }
+
+  /* ---------- modal ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.4); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);
+    display:flex; align-items:flex-end; justify-content:center; z-index:100; padding:0;
+    animation:overlayin .18s ease;
+  }
+  @keyframes overlayin{ from{ opacity:0; } to{ opacity:1; } }
+  .modal{
+    background:var(--bg); width:100%; max-width:520px; max-height:88vh; overflow-y:auto;
+    border-radius:20px 20px 0 0; box-shadow:var(--shadow-2); animation:modalup .22s cubic-bezier(.2,.8,.2,1);
+  }
+  @media (min-width:640px){
+    .overlay{ align-items:center; padding:20px; }
+    .modal{ border-radius:20px; max-height:min(88vh,720px); }
+    @keyframes modalup{ from{ opacity:0; transform:translateY(10px) scale(.98); } to{ opacity:1; transform:none; } }
+  }
+  @media (max-width:639px){
+    @keyframes modalup{ from{ transform:translateY(100%); } to{ transform:translateY(0); } }
+  }
+  .modal-head{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; padding:16px 18px;
+    border-bottom:1px solid var(--sep); position:sticky; top:0; background:var(--bg); z-index:2;
+  }
+  .modal-head h3{ font-size:1.05rem; }
+  .modal-body{ padding:18px; }
+  .modal-foot{ padding:14px 18px 18px; display:flex; gap:10px; border-top:1px solid var(--sep); }
+
+  /* ---------- toast ---------- */
+  .toast{
+    position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(10px); z-index:200;
+    background:var(--label); color:var(--bg); padding:10px 18px; border-radius:980px; font-size:.84rem; font-weight:600;
+    box-shadow:var(--shadow-2); opacity:0; transition:opacity .25s ease, transform .25s ease; pointer-events:none;
+    display:flex; align-items:center; gap:8px;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast svg{ width:14px; height:14px; }
+
+  footer.credit{ text-align:center; color:var(--label-3); font-size:.76rem; padding:8px 20px 30px; }
+
+  @media (max-width:480px){
+    .brand .tag{ display:none; }
+    .podium-slot.rank-1 .podium-bar{ height:88px; }
+    .podium-slot.rank-2 .podium-bar{ height:66px; }
+    .podium-slot.rank-3 .podium-bar{ height:50px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="navbar">
+    <div class="navbar-inner">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="12" height="15.5" rx="2.2" transform="rotate(-10 9 14.5)"/><rect x="9.2" y="4" width="12" height="15.5" rx="2.2"/></svg>
+        </div>
+        <div class="brand-text">
+          <h1>Mau-Mau Manager</h1>
+          <p class="tag" id="rulesetTag">Regelwerk „GriKlö“</p>
+        </div>
+      </div>
+      <div class="navbar-right">
+        <button class="icon-btn" id="themeToggle" title="Darstellung wechseln" aria-label="Darstellung wechseln"></button>
+      </div>
+    </div>
+    <div class="tabbar">
+      <div class="tabbar-track" id="tabbarTrack"></div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="view" id="view"></div>
+    <footer class="credit">Alle Daten bleiben lokal in diesem Browser gespeichert.</footer>
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================ ICONS ============================ */
+  var ICONS = {
+    crown:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 8.5l4.3 3 4.7-6.8 4.7 6.8 4.3-3-2.1 9.8H5.1L3 8.5z"/><rect x="5" y="19" width="14" height="2.2" rx="1.1"/></svg>',
+    medal:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8.5 3h7l-3 6.2h-1z" fill-opacity=".55"/><circle cx="12" cy="14.5" r="6.3"/></svg>',
+    ranking:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V10M12 21V4M18 21v-7"/></svg>',
+    person:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.8 20c0-4 3.2-7.2 7.2-7.2s7.2 3.2 7.2 7.2"/></svg>',
+    calendar:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.4" y="5" width="17.2" height="15.2" rx="3"/><line x1="3.4" y1="9.6" x2="20.6" y2="9.6"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/></svg>',
+    chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6.5"/><line x1="19" y1="20" x2="19" y2="14.5"/><line x1="3" y1="20.5" x2="21" y2="20.5"/></svg>',
+    book:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.8C4 4.8 4.8 4 5.8 4H12v16H5.8C4.8 20 4 19.2 4 18.2z"/><path d="M20 5.8c0-1-.8-1.8-1.8-1.8H12v16h6.2c1 0 1.8-.8 1.8-1.8z"/></svg>',
+    plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    minus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+    trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="7" x2="20" y2="7"/><path d="M6 7l1 13a2 2 0 002 2h6a2 2 0 002-2l1-13"/><path d="M9 7V4.5A1.5 1.5 0 0110.5 3h3A1.5 1.5 0 0115 4.5V7"/></svg>',
+    pencil:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1-4.2L15.8 4.8l3.4 3.4L8.2 19.2 4 20z"/><line x1="14" y1="6.6" x2="17.4" y2="10"/></svg>',
+    chevron:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>',
+    close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>',
+    check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 13 10 18 19 7"/></svg>',
+    sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2.2" x2="12" y2="4.6"/><line x1="12" y1="19.4" x2="12" y2="21.8"/><line x1="2.2" y1="12" x2="4.6" y2="12"/><line x1="19.4" y1="12" x2="21.8" y2="12"/><line x1="5" y1="5" x2="6.7" y2="6.7"/><line x1="17.3" y1="17.3" x2="19" y2="19"/><line x1="5" y1="19" x2="6.7" y2="17.3"/><line x1="17.3" y1="6.7" x2="19" y2="5"/></svg>',
+    moon:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M20.2 14.9A8.6 8.6 0 1110.3 4.2a7.1 7.1 0 009.9 10.7z"/></svg>',
+    auto:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.6"/><path d="M12 3.4a8.6 8.6 0 010 17.2z" fill="currentColor" stroke="none"/></svg>',
+    warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.2 21.4 20H2.6L12 4.2z"/><line x1="12" y1="10" x2="12" y2="14.4"/><circle cx="12" cy="17.3" r=".2" fill="currentColor" stroke-width="1.6"/></svg>'
+  };
+
+  var PALETTE = ["#FF3B30","#FF9500","#FFCC00","#34C759","#00C7BE","#32ADE6","#007AFF","#5856D6","#AF52DE","#FF2D55","#A2845E","#8E8E93"];
+
+  /* ============================ STATE ============================ */
+  var STORAGE_KEY = "maumau-manager-state-v1";
+  var THEME_KEY = "maumau-manager-theme";
+
+  function uid(){
+    if(window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9);
+  }
+
+  function defaultState(){
+    return {
+      players: [],
+      matchdays: [],
+      rules: {
+        name: "GriKlö",
+        scoring: "lower", // "lower" = wenigste Punkte gewinnt, "higher" = meiste Punkte gewinnt
+        mauPenalty: 0,
+        items: [
+          "Bube auf Bube auflegen ist grundsätzlich nicht erlaubt.",
+          "Es ist immer eine passende Karte in der ausliegenden Farbe auszuspielen – oder ein weiteres Ass mit direkter Folgekarte in der Farbe. Andernfalls ist eine Karte zu ziehen.",
+          "Auf eine Acht kann eine weitere Acht gelegt werden."
+        ]
+      }
+    };
+  }
+
+  var state = load();
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return defaultState();
+      var parsed = JSON.parse(raw);
+      var d = defaultState();
+      return {
+        players: Array.isArray(parsed.players) ? parsed.players : [],
+        matchdays: Array.isArray(parsed.matchdays) ? parsed.matchdays : [],
+        rules: Object.assign({}, d.rules, parsed.rules || {})
+      };
+    }catch(e){ return defaultState(); }
+  }
+  function save(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  var ui = {
+    tab: "ranking",
+    expandedMatchdays: new Set(),
+    statsPlayerId: null
+  };
+
+  /* ============================ THEME ============================ */
+  function currentTheme(){ return localStorage.getItem(THEME_KEY) || "auto"; }
+  function applyTheme(){
+    var t = currentTheme();
+    if(t === "auto") document.documentElement.removeAttribute("data-theme");
+    else document.documentElement.setAttribute("data-theme", t);
+    var btn = document.getElementById("themeToggle");
+    var icon = t === "light" ? ICONS.sun : (t === "dark" ? ICONS.moon : ICONS.auto);
+    btn.innerHTML = icon;
+    btn.title = "Darstellung: " + (t === "light" ? "Hell" : t === "dark" ? "Dunkel" : "System");
+  }
+  document.getElementById("themeToggle").addEventListener("click", function(){
+    var order = ["auto","light","dark"];
+    var next = order[(order.indexOf(currentTheme())+1) % order.length];
+    localStorage.setItem(THEME_KEY, next);
+    applyTheme();
+  });
+  applyTheme();
+
+  /* ============================ TOAST ============================ */
+  var toastEl = document.getElementById("toast");
+  var toastTimer = null;
+  function toast(msg){
+    toastEl.innerHTML = ICONS.check + '<span>' + esc(msg) + '</span>';
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove("show"); }, 1900);
+  }
+
+  /* ============================ HELPERS ============================ */
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function initials(p){
+    var a = (p.firstName||"").trim().charAt(0);
+    var b = (p.lastName||"").trim().charAt(0);
+    return (a+b).toUpperCase() || "?";
+  }
+  function fullName(p){ return ((p.firstName||"")+" "+(p.lastName||"")).trim() || "Unbenannt"; }
+  function playerById(id){ return state.players.find(function(p){ return p.id === id; }); }
+  function nextColor(){ return PALETTE[state.players.length % PALETTE.length]; }
+
+  function fmtDate(iso){
+    var d = new Date(iso);
+    if(isNaN(d)) return "–";
+    return d.toLocaleDateString("de-DE", { weekday:"short", day:"2-digit", month:"2-digit", year:"numeric" });
+  }
+  function fmtTime(iso){
+    var d = new Date(iso);
+    if(isNaN(d)) return "";
+    return d.toLocaleTimeString("de-DE", { hour:"2-digit", minute:"2-digit" });
+  }
+  function pad2(n){ return String(n).padStart(2,"0"); }
+  function nowDateVal(){ var d = new Date(); return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+  function nowTimeVal(){ var d = new Date(); return pad2(d.getHours())+":"+pad2(d.getMinutes()); }
+
+  function sortedMatchdays(){
+    return state.matchdays.slice().sort(function(a,b){ return new Date(b.dateTime) - new Date(a.dateTime); });
+  }
+
+  function matchdayWinnerIds(md){
+    if(!md.entries.length) return [];
+    var best = state.rules.scoring === "higher"
+      ? Math.max.apply(null, md.entries.map(function(e){ return e.points; }))
+      : Math.min.apply(null, md.entries.map(function(e){ return e.points; }));
+    return md.entries.filter(function(e){ return e.points === best; }).map(function(e){ return e.playerId; });
+  }
+
+  function standings(){
+    var wins = {};
+    state.matchdays.forEach(function(md){
+      matchdayWinnerIds(md).forEach(function(pid){ wins[pid] = (wins[pid]||0) + 1; });
+    });
+    var rows = state.players.map(function(p){
+      var total = 0, count = 0, mau = 0, best = null, worst = null;
+      state.matchdays.forEach(function(md){
+        var e = md.entries.find(function(x){ return x.playerId === p.id; });
+        if(e){
+          total += e.points;
+          mau += e.mauViolations || 0;
+          count++;
+          if(best === null || e.points < best) best = e.points;
+          if(worst === null || e.points > worst) worst = e.points;
+        }
+      });
+      var penalty = mau * (Number(state.rules.mauPenalty) || 0);
+      return {
+        player: p,
+        matchdays: count,
+        rawPoints: total,
+        mau: mau,
+        penalty: penalty,
+        total: total + penalty,
+        avg: count ? (total + penalty) / count : 0,
+        wins: wins[p.id] || 0,
+        best: best, worst: worst
+      };
+    });
+    var played = rows.filter(function(r){ return r.matchdays > 0; });
+    var unplayed = rows.filter(function(r){ return r.matchdays === 0; });
+    played.sort(function(a,b){
+      var diff = state.rules.scoring === "higher" ? (b.total - a.total) : (a.total - b.total);
+      if(diff !== 0) return diff;
+      if(b.wins !== a.wins) return b.wins - a.wins;
+      return fullName(a.player).localeCompare(fullName(b.player));
+    });
+    unplayed.sort(function(a,b){ return fullName(a.player).localeCompare(fullName(b.player)); });
+    return played.concat(unplayed);
+  }
+
+  /* ============================ TABS ============================ */
+  var TABS = [
+    { id:"ranking", label:"Rangliste", icon:ICONS.ranking },
+    { id:"players", label:"Spieler", icon:ICONS.person },
+    { id:"matchdays", label:"Spieltage", icon:ICONS.calendar },
+    { id:"stats", label:"Statistik", icon:ICONS.chart },
+    { id:"rules", label:"Regelwerk", icon:ICONS.book }
+  ];
+
+  function renderTabbar(){
+    var track = document.getElementById("tabbarTrack");
+    track.innerHTML = TABS.map(function(t){
+      return '<button class="tab'+(ui.tab===t.id?' active':'')+'" data-action="set-tab" data-tab="'+t.id+'">'+t.icon+'<span>'+t.label+'</span></button>';
+    }).join("");
+  }
+
+  function setTab(id){
+    ui.tab = id;
+    renderTabbar();
+    renderView();
+  }
+
+  /* ============================ RENDER: RANKING ============================ */
+  function renderRanking(){
+    var rows = standings();
+    var html = "";
+
+    document.getElementById("rulesetTag").textContent = "Regelwerk „" + (state.rules.name || "Eigenes Regelwerk") + "“";
+
+    if(!state.players.length){
+      html += emptyState(ICONS.person, "Noch keine Spieler", "Legt zuerst eure Spieler an, um eine Rangliste zu sehen.",
+        '<button class="btn btn-primary" data-action="add-player">'+ICONS.plus+'Spieler anlegen</button>');
+      document.getElementById("view").innerHTML = html;
+      return;
+    }
+
+    var played = rows.filter(function(r){ return r.matchdays > 0; });
+    var unplayed = rows.filter(function(r){ return r.matchdays === 0; });
+
+    html += '<div class="section-head"><div><h2>Rangliste</h2><div class="section-sub">'+
+      (state.rules.scoring === "higher" ? "Meiste Punkte gewinnt" : "Wenigste Punkte gewinnt") +
+      (state.matchdays.length ? " · " + state.matchdays.length + " Spieltag(e)" : "") +
+      '</div></div></div>';
+
+    if(!played.length){
+      html += emptyState(ICONS.calendar, "Noch keine Spieltage", "Erfasst euren ersten Spieltag, um die Rangliste zu füllen.",
+        '<button class="btn btn-primary" data-action="add-matchday">'+ICONS.plus+'Spieltag erfassen</button>');
+    } else {
+      var top3 = played.slice(0,3);
+      if(top3.length){
+        var order = top3.length >= 3 ? [1,0,2] : (top3.length === 2 ? [1,0] : [0]);
+        html += '<div class="podium">';
+        order.forEach(function(idx){
+          var r = top3[idx];
+          if(!r) return;
+          var rank = idx+1;
+          html += '<div class="podium-slot rank-'+rank+'">'+
+            (rank===1 ? '<div class="crown">'+ICONS.crown+'</div>' : '<div style="height:22px"></div>') +
+            '<div class="avatar" style="background:'+r.player.color+'">'+esc(initials(r.player))+'</div>'+
+            '<div class="podium-name">'+esc(fullName(r.player))+'</div>'+
+            '<div class="podium-score">'+r.total+' Pkt.</div>'+
+            '<div class="podium-bar"><span class="podium-rank">'+rank+'</span></div>'+
+          '</div>';
+        });
+        html += '</div>';
+      }
+
+      html += '<div class="card"><div class="list">';
+      played.forEach(function(r, i){
+        html += '<div class="rank-row">'+
+          '<div class="rank-num">'+(i+1)+'</div>'+
+          '<div class="avatar sm" style="background:'+r.player.color+'">'+esc(initials(r.player))+'</div>'+
+          '<div class="rank-info">'+
+            '<div class="name">'+esc(fullName(r.player))+'</div>'+
+            '<div class="meta">'+r.matchdays+' Spieltag(e) · Ø '+round1(r.avg)+' Pkt.'+(r.wins?' · '+r.wins+'× Sieg':'')+(r.mau?' · '+r.mau+' Mau-Verstoß(e)':'')+'</div>'+
+          '</div>'+
+          '<div class="rank-score"><div class="val">'+r.total+'</div><div class="lbl">Punkte</div></div>'+
+        '</div>';
+      });
+      html += '</div></div>';
+    }
+
+    if(unplayed.length){
+      html += '<div class="section-head"><h2 style="font-size:1rem;color:var(--label-2)">Noch ohne Spieltag</h2></div>';
+      html += '<div class="card"><div class="list">';
+      unplayed.forEach(function(r){
+        html += '<div class="rank-row">'+
+          '<div class="rank-num">–</div>'+
+          '<div class="avatar sm" style="background:'+r.player.color+'">'+esc(initials(r.player))+'</div>'+
+          '<div class="rank-info"><div class="name">'+esc(fullName(r.player))+'</div></div>'+
+        '</div>';
+      });
+      html += '</div></div>';
+    }
+
+    document.getElementById("view").innerHTML = html;
+  }
+  function round1(n){ return Math.round(n*10)/10; }
+
+  function emptyState(icon, title, sub, actionsHtml){
+    return '<div class="card"><div class="empty">'+
+      '<div class="empty-icon">'+icon+'</div>'+
+      '<strong>'+esc(title)+'</strong>'+
+      '<p>'+esc(sub)+'</p>'+
+      (actionsHtml||'') +
+    '</div></div>';
+  }
+
+  /* ============================ RENDER: PLAYERS ============================ */
+  function renderPlayers(){
+    var html = '<div class="section-head"><div><h2>Spieler</h2><div class="section-sub">'+state.players.length+' Spieler angelegt</div></div>'+
+      '<button class="btn btn-primary btn-sm" data-action="add-player">'+ICONS.plus+'Neu</button></div>';
+
+    if(!state.players.length){
+      html += emptyState(ICONS.person, "Noch keine Spieler", "Fügt euren ersten Spieler mit Vor- und Nachname hinzu.",
+        '<button class="btn btn-primary" data-action="add-player">'+ICONS.plus+'Spieler anlegen</button>');
+    } else {
+      var rows = standings();
+      var byId = {};
+      rows.forEach(function(r){ byId[r.player.id] = r; });
+      html += '<div class="players-grid">';
+      state.players.forEach(function(p){
+        var r = byId[p.id];
+        html += '<div class="player-card">'+
+          '<div class="player-card-top">'+
+            '<div class="avatar lg" style="background:'+p.color+'">'+esc(initials(p))+'</div>'+
+            '<div><div class="name">'+esc(fullName(p))+'</div><div class="sub">seit '+ (p.createdAt ? new Date(p.createdAt).toLocaleDateString("de-DE") : "–") +'</div></div>'+
+          '</div>'+
+          '<div class="player-stats">'+
+            '<div><strong>'+(r?r.total:0)+'</strong>Punkte</div>'+
+            '<div><strong>'+(r?r.matchdays:0)+'</strong>Spieltage</div>'+
+            '<div><strong>'+(r?r.wins:0)+'</strong>Siege</div>'+
+          '</div>'+
+          '<div class="player-card-actions">'+
+            '<button class="btn btn-secondary btn-sm" data-action="edit-player" data-id="'+p.id+'">'+ICONS.pencil+'Bearbeiten</button>'+
+            '<button class="btn btn-destructive btn-sm" data-action="delete-player" data-id="'+p.id+'">'+ICONS.trash+'</button>'+
+          '</div>'+
+        '</div>';
+      });
+      html += '</div>';
+    }
+    document.getElementById("view").innerHTML = html;
+  }
+
+  /* ============================ RENDER: MATCHDAYS ============================ */
+  function renderMatchdays(){
+    var html = '<div class="section-head"><div><h2>Spieltage</h2><div class="section-sub">'+state.matchdays.length+' erfasst</div></div>'+
+      '<button class="btn btn-primary btn-sm" data-action="add-matchday" '+(!state.players.length?'disabled':'')+'>'+ICONS.plus+'Neu</button></div>';
+
+    if(!state.players.length){
+      html += emptyState(ICONS.person, "Erst Spieler anlegen", "Legt mindestens einen Spieler an, bevor ihr einen Spieltag erfassen könnt.",
+        '<button class="btn btn-primary" data-action="add-player">'+ICONS.plus+'Spieler anlegen</button>');
+      document.getElementById("view").innerHTML = html;
+      return;
+    }
+
+    var mds = sortedMatchdays();
+    if(!mds.length){
+      html += emptyState(ICONS.calendar, "Noch keine Spieltage", "Erfasst euren ersten Spieltag mit Datum, Uhrzeit und Punkten.",
+        '<button class="btn btn-primary" data-action="add-matchday">'+ICONS.plus+'Spieltag erfassen</button>');
+    } else {
+      mds.forEach(function(md){
+        var open = ui.expandedMatchdays.has(md.id);
+        var winners = matchdayWinnerIds(md);
+        var entries = md.entries.slice().sort(function(a,b){
+          return state.rules.scoring === "higher" ? b.points - a.points : a.points - b.points;
+        });
+        html += '<div class="md-card">'+
+          '<div class="md-head" data-action="toggle-matchday" data-id="'+md.id+'">'+
+            '<div class="md-date"><div class="d">'+fmtDate(md.dateTime)+'</div><div class="t">'+fmtTime(md.dateTime)+' Uhr · '+md.entries.length+' Spieler'+(md.note?' · '+esc(md.note):'')+'</div></div>'+
+            '<div class="md-actions">'+
+              '<button class="icon-btn" data-action="edit-matchday" data-id="'+md.id+'" title="Bearbeiten">'+ICONS.pencil+'</button>'+
+              '<button class="icon-btn" data-action="delete-matchday" data-id="'+md.id+'" title="Löschen">'+ICONS.trash+'</button>'+
+            '</div>'+
+            '<div class="chev'+(open?' open':'')+'">'+ICONS.chevron+'</div>'+
+          '</div>';
+        if(open){
+          html += '<div class="md-body">';
+          if(!entries.length){
+            html += '<div class="md-note">Keine Punkte erfasst.</div>';
+          } else {
+            html += '<table class="md-table"><thead><tr><th>Spieler</th><th>Punkte</th><th>Mau-Verstöße</th><th></th></tr></thead><tbody>';
+            entries.forEach(function(e){
+              var p = playerById(e.playerId);
+              if(!p) return;
+              var isWinner = winners.indexOf(e.playerId) !== -1;
+              html += '<tr><td><div class="md-player"><div class="avatar sm" style="background:'+p.color+'">'+esc(initials(p))+'</div>'+esc(fullName(p))+'</div></td>'+
+                '<td><strong>'+e.points+'</strong></td>'+
+                '<td>'+(e.mauViolations ? e.mauViolations : '–')+'</td>'+
+                '<td>'+(isWinner ? '<span class="chip win">'+ICONS.crown+'Sieg</span>' : '')+'</td>'+
+              '</tr>';
+            });
+            html += '</tbody></table>';
+          }
+          html += '</div>';
+        }
+        html += '</div>';
+      });
+    }
+    document.getElementById("view").innerHTML = html;
+  }
+
+  /* ============================ RENDER: STATS ============================ */
+  function renderStats(){
+    var html = '<div class="section-head"><div><h2>Statistik</h2><div class="section-sub">Auswertung pro Spieler &amp; Spieltag</div></div></div>';
+
+    if(!state.players.length){
+      html += emptyState(ICONS.chart, "Noch keine Daten", "Legt Spieler an und erfasst Spieltage, um Statistiken zu sehen.", "");
+      document.getElementById("view").innerHTML = html;
+      return;
+    }
+
+    var rows = standings();
+    if(!ui.statsPlayerId || !playerById(ui.statsPlayerId)){
+      ui.statsPlayerId = state.players[0].id;
+    }
+
+    html += '<div class="card pad">';
+    html += '<div class="field" style="margin-bottom:0"><label>Spieler auswählen</label><select id="statsPlayerSelect">';
+    state.players.forEach(function(p){
+      html += '<option value="'+p.id+'" '+(p.id===ui.statsPlayerId?'selected':'')+'>'+esc(fullName(p))+'</option>';
+    });
+    html += '</select></div></div>';
+
+    var r = rows.find(function(x){ return x.player.id === ui.statsPlayerId; });
+    if(r){
+      html += '<div class="card pad">'+
+        '<div class="stat-grid">'+
+          statTile(r.total, "Gesamtpunkte") +
+          statTile(r.matchdays, "Spieltage") +
+          statTile(round1(r.avg), "Ø Punkte") +
+          statTile(r.wins, "Siege") +
+          statTile(r.mau, "Mau-Verstöße") +
+          statTile(r.best===null?"–":r.best, "Beste Runde") +
+        '</div>'+
+      '</div>';
+
+      var history = state.matchdays.filter(function(md){ return md.entries.some(function(e){ return e.playerId === r.player.id; }); })
+        .sort(function(a,b){ return new Date(a.dateTime) - new Date(b.dateTime); });
+      if(history.length){
+        var vals = history.map(function(md){ return md.entries.find(function(e){ return e.playerId === r.player.id; }).points; });
+        var maxAbs = Math.max(1, Math.max.apply(null, vals.map(Math.abs)));
+        html += '<div class="card pad"><h3 style="font-size:.92rem;margin-bottom:10px">Punkteverlauf</h3>';
+        history.forEach(function(md){
+          var e = md.entries.find(function(x){ return x.playerId === r.player.id; });
+          var pct = Math.max(4, Math.round(Math.abs(e.points)/maxAbs*100));
+          html += '<div class="bar-row"><div class="who">'+fmtDate(md.dateTime).split(",")[0]+'</div>'+
+            '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+r.player.color+'"></div></div>'+
+            '<div class="bar-val">'+e.points+'</div></div>';
+        });
+        html += '</div>';
+      }
+    }
+
+    if(rows.some(function(x){ return x.matchdays > 0; })){
+      var maxTotal = Math.max(1, Math.max.apply(null, rows.map(function(x){ return Math.abs(x.total); })));
+      html += '<div class="card pad"><h3 style="font-size:.92rem;margin-bottom:10px">Gesamtpunkte im Vergleich</h3>';
+      rows.forEach(function(x){
+        var pct = Math.max(4, Math.round(Math.abs(x.total)/maxTotal*100));
+        html += '<div class="bar-row"><div class="who">'+esc(fullName(x.player))+'</div>'+
+          '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:'+x.player.color+'"></div></div>'+
+          '<div class="bar-val">'+x.total+'</div></div>';
+      });
+      html += '</div>';
+
+      var maxMau = Math.max(1, Math.max.apply(null, rows.map(function(x){ return x.mau; })));
+      if(rows.some(function(x){ return x.mau > 0; })){
+        html += '<div class="card pad"><h3 style="font-size:.92rem;margin-bottom:10px">Mau-Verstöße im Vergleich</h3>';
+        rows.forEach(function(x){
+          var pct = Math.max(4, Math.round(x.mau/maxMau*100));
+          html += '<div class="bar-row"><div class="who">'+esc(fullName(x.player))+'</div>'+
+            '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%;background:var(--orange)"></div></div>'+
+            '<div class="bar-val">'+x.mau+'</div></div>';
+        });
+        html += '</div>';
+      }
+    }
+
+    document.getElementById("view").innerHTML = html;
+    var sel = document.getElementById("statsPlayerSelect");
+    if(sel) sel.addEventListener("change", function(){ ui.statsPlayerId = sel.value; renderStats(); });
+  }
+  function statTile(n,l){ return '<div class="stat-tile"><div class="n">'+n+'</div><div class="l">'+esc(l)+'</div></div>'; }
+
+  /* ============================ RENDER: RULES ============================ */
+  function renderRules(){
+    var r = state.rules;
+    var html = '<div class="section-head"><div><h2>Regelwerk</h2><div class="section-sub">Euer individuelles Mau-Mau-Regelwerk</div></div></div>';
+
+    html += '<div class="card pad">'+
+      '<div class="field"><label>Name des Regelwerks</label><input type="text" id="ruleName" value="'+esc(r.name)+'" placeholder="z. B. GriKlö" /></div>'+
+      '<div class="field"><label>Wertung</label>'+
+        '<div class="seg" id="scoringSeg">'+
+          '<button data-val="lower" class="'+(r.scoring==="lower"?"active":"")+'">Wenigste Punkte gewinnt</button>'+
+          '<button data-val="higher" class="'+(r.scoring==="higher"?"active":"")+'">Meiste Punkte gewinnt</button>'+
+        '</div>'+
+        '<div class="hint">Bestimmt, wer in der Rangliste vorn steht.</div>'+
+      '</div>'+
+      '<div class="field" style="margin-bottom:0"><label>Strafpunkte je Mau-Verstoß</label><input type="number" id="mauPenalty" value="'+(r.mauPenalty||0)+'" step="1" />'+
+        '<div class="hint">Optional – wird automatisch mit in die Gesamtpunktzahl je Spieler eingerechnet. 0 = nur Zählung ohne Punkteinfluss.</div>'+
+      '</div>'+
+    '</div>';
+
+    html += '<div class="section-head"><h2 style="font-size:1rem">Regeln</h2><button class="btn btn-secondary btn-sm" data-action="add-rule">'+ICONS.plus+'Regel</button></div>';
+    html += '<div class="card pad" id="rulesList">';
+    if(!r.items.length){
+      html += '<div class="hint">Noch keine Regeln erfasst.</div>';
+    } else {
+      r.items.forEach(function(text, i){
+        html += '<div class="rule-row"><div class="rule-num">'+(i+1)+'</div>'+
+          '<textarea data-index="'+i+'" class="rule-text">'+esc(text)+'</textarea>'+
+          '<button class="icon-btn" data-action="remove-rule" data-index="'+i+'" title="Entfernen">'+ICONS.trash+'</button>'+
+        '</div>';
+      });
+    }
+    html += '</div>';
+
+    document.getElementById("view").innerHTML = html;
+
+    document.getElementById("ruleName").addEventListener("input", debounce(function(e){
+      state.rules.name = e.target.value.trim() || "Eigenes Regelwerk";
+      save(); document.getElementById("rulesetTag").textContent = "Regelwerk „"+state.rules.name+"“"; toast("Gespeichert");
+    }, 500));
+    document.getElementById("mauPenalty").addEventListener("input", debounce(function(e){
+      state.rules.mauPenalty = Number(e.target.value) || 0;
+      save(); toast("Gespeichert");
+    }, 500));
+    document.querySelectorAll("#scoringSeg button").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        state.rules.scoring = btn.getAttribute("data-val");
+        save(); toast("Gespeichert"); renderRules();
+      });
+    });
+    document.querySelectorAll(".rule-text").forEach(function(ta){
+      ta.addEventListener("input", debounce(function(){
+        var i = Number(ta.getAttribute("data-index"));
+        state.rules.items[i] = ta.value;
+        save(); toast("Gespeichert");
+      }, 500));
+    });
+  }
+
+  function debounce(fn, ms){
+    var t;
+    return function(){
+      var args = arguments, ctx = this;
+      clearTimeout(t);
+      t = setTimeout(function(){ fn.apply(ctx, args); }, ms);
+    };
+  }
+
+  /* ============================ MAIN RENDER ============================ */
+  function renderView(){
+    if(ui.tab === "ranking") renderRanking();
+    else if(ui.tab === "players") renderPlayers();
+    else if(ui.tab === "matchdays") renderMatchdays();
+    else if(ui.tab === "stats") renderStats();
+    else if(ui.tab === "rules") renderRules();
+  }
+
+  /* ============================ MODALS ============================ */
+  var modalRoot = document.getElementById("modalRoot");
+  function openModal(title, bodyHtml, footHtml){
+    modalRoot.innerHTML =
+      '<div class="overlay" id="overlay">'+
+        '<div class="modal" role="dialog" aria-modal="true">'+
+          '<div class="modal-head"><h3>'+esc(title)+'</h3><button class="icon-btn" data-action="close-modal">'+ICONS.close+'</button></div>'+
+          '<div class="modal-body">'+bodyHtml+'</div>'+
+          (footHtml ? '<div class="modal-foot">'+footHtml+'</div>' : '') +
+        '</div>'+
+      '</div>';
+    document.getElementById("overlay").addEventListener("click", function(e){
+      if(e.target.id === "overlay") closeModal();
+    });
+  }
+  function closeModal(){ modalRoot.innerHTML = ""; }
+
+  function openPlayerModal(playerId){
+    var editing = playerId ? playerById(playerId) : null;
+    var color = editing ? editing.color : nextColor();
+    var body = '<form id="playerForm">'+
+      '<div class="field-row">'+
+        '<div class="field"><label>Vorname</label><input type="text" id="pFirst" required value="'+esc(editing?editing.firstName:"")+'" placeholder="Vorname" /></div>'+
+        '<div class="field"><label>Nachname</label><input type="text" id="pLast" required value="'+esc(editing?editing.lastName:"")+'" placeholder="Nachname" /></div>'+
+      '</div>'+
+      '<div class="field"><label>Farbe</label><div class="swatches" id="swatches">'+
+        PALETTE.map(function(c){ return '<div class="swatch'+(c===color?" selected":"")+'" data-color="'+c+'" style="background:'+c+'"></div>'; }).join("")+
+      '</div><input type="hidden" id="pColor" value="'+color+'" /></div>'+
+    '</form>';
+    var foot = '<button class="btn btn-secondary btn-block" data-action="close-modal">Abbrechen</button>'+
+      '<button class="btn btn-primary btn-block" id="playerSubmit">'+(editing?"Speichern":"Anlegen")+'</button>';
+    openModal(editing ? "Spieler bearbeiten" : "Neuer Spieler", body, foot);
+
+    document.querySelectorAll("#swatches .swatch").forEach(function(sw){
+      sw.addEventListener("click", function(){
+        document.querySelectorAll("#swatches .swatch").forEach(function(s){ s.classList.remove("selected"); });
+        sw.classList.add("selected");
+        document.getElementById("pColor").value = sw.getAttribute("data-color");
+      });
+    });
+
+    document.getElementById("playerSubmit").addEventListener("click", function(){
+      var first = document.getElementById("pFirst").value.trim();
+      var last = document.getElementById("pLast").value.trim();
+      if(!first || !last){ toast("Bitte Vor- und Nachname angeben"); return; }
+      var col = document.getElementById("pColor").value;
+      if(editing){
+        editing.firstName = first; editing.lastName = last; editing.color = col;
+        toast("Spieler aktualisiert");
+      } else {
+        state.players.push({ id: uid(), firstName: first, lastName: last, color: col, createdAt: new Date().toISOString() });
+        toast("Spieler angelegt");
+      }
+      save(); closeModal(); renderView();
+    });
+  }
+
+  function openMatchdayModal(matchdayId){
+    var editing = matchdayId ? state.matchdays.find(function(m){ return m.id === matchdayId; }) : null;
+    var dateVal = editing ? editing.dateTime.slice(0,10) : nowDateVal();
+    var timeVal = editing ? new Date(editing.dateTime).toTimeString().slice(0,5) : nowTimeVal();
+    var entryMap = {};
+    if(editing) editing.entries.forEach(function(e){ entryMap[e.playerId] = e; });
+
+    var rowsHtml = state.players.map(function(p){
+      var e = entryMap[p.id];
+      var included = editing ? !!e : true;
+      var pts = e ? e.points : 0;
+      var mau = e ? (e.mauViolations||0) : 0;
+      return '<div class="participant-row" data-player="'+p.id+'">'+
+        '<div class="who"><button type="button" class="toggle-in'+(included?" on":"")+'" data-action="toggle-participant" data-id="'+p.id+'">'+(included?ICONS.check:'')+'</button>'+
+          '<div class="avatar sm" style="background:'+p.color+'">'+esc(initials(p))+'</div>'+
+          '<div class="name">'+esc(fullName(p))+'</div></div>'+
+        '<input type="number" class="pts-input" data-pts="'+p.id+'" value="'+pts+'" step="1" title="Punkte" />'+
+        '<div class="stepper" data-mau="'+p.id+'">'+
+          '<button type="button" data-action="mau-dec" data-id="'+p.id+'">'+ICONS.minus+'</button>'+
+          '<span class="val" id="mauVal-'+p.id+'">'+mau+'</span>'+
+          '<button type="button" data-action="mau-inc" data-id="'+p.id+'">'+ICONS.plus+'</button>'+
+        '</div>'+
+      '</div>';
+    }).join("");
+
+    var body = '<form id="mdForm">'+
+      '<div class="field-row">'+
+        '<div class="field"><label>Datum</label><input type="date" id="mdDate" value="'+dateVal+'" required /></div>'+
+        '<div class="field"><label>Uhrzeit</label><input type="time" id="mdTime" value="'+timeVal+'" required /></div>'+
+      '</div>'+
+      '<div class="field"><label>Notiz (optional)</label><input type="text" id="mdNote" value="'+esc(editing?editing.note||"":"")+'" placeholder="z. B. Ort oder Anlass" /></div>'+
+      '<div class="field"><label>Teilnehmer &amp; Punkte</label>'+
+        '<div class="hint" style="margin:-2px 0 10px">Häkchen = nimmt teil. Mau-Verstöße sind optional.</div>'+
+        '<div id="participants">'+rowsHtml+'</div>'+
+      '</div>'+
+    '</form>';
+    var foot = '<button class="btn btn-secondary btn-block" data-action="close-modal">Abbrechen</button>'+
+      '<button class="btn btn-primary btn-block" id="mdSubmit">'+(editing?"Speichern":"Erfassen")+'</button>';
+    openModal(editing ? "Spieltag bearbeiten" : "Neuer Spieltag", body, foot);
+
+    document.querySelectorAll('[data-action="toggle-participant"]').forEach(function(btn){
+      btn.addEventListener("click", function(){
+        btn.classList.toggle("on");
+        btn.innerHTML = btn.classList.contains("on") ? ICONS.check : "";
+      });
+    });
+    document.querySelectorAll('[data-action="mau-inc"]').forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var id = btn.getAttribute("data-id");
+        var el = document.getElementById("mauVal-"+id);
+        el.textContent = Math.max(0, Number(el.textContent)+1);
+      });
+    });
+    document.querySelectorAll('[data-action="mau-dec"]').forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var id = btn.getAttribute("data-id");
+        var el = document.getElementById("mauVal-"+id);
+        el.textContent = Math.max(0, Number(el.textContent)-1);
+      });
+    });
+
+    document.getElementById("mdSubmit").addEventListener("click", function(){
+      var d = document.getElementById("mdDate").value;
+      var t = document.getElementById("mdTime").value;
+      if(!d || !t){ toast("Bitte Datum und Uhrzeit angeben"); return; }
+      var iso = new Date(d+"T"+t+":00").toISOString();
+      var note = document.getElementById("mdNote").value.trim();
+      var entries = [];
+      state.players.forEach(function(p){
+        var row = document.querySelector('.participant-row[data-player="'+p.id+'"]');
+        var on = row.querySelector('[data-action="toggle-participant"]').classList.contains("on");
+        if(!on) return;
+        var pts = Number(row.querySelector('[data-pts="'+p.id+'"]').value) || 0;
+        var mau = Number(document.getElementById("mauVal-"+p.id).textContent) || 0;
+        entries.push({ playerId: p.id, points: pts, mauViolations: mau });
+      });
+      if(!entries.length){ toast("Mindestens ein teilnehmender Spieler nötig"); return; }
+      if(editing){
+        editing.dateTime = iso; editing.note = note; editing.entries = entries;
+        toast("Spieltag aktualisiert");
+      } else {
+        state.matchdays.push({ id: uid(), dateTime: iso, note: note, entries: entries });
+        toast("Spieltag erfasst");
+      }
+      save(); closeModal(); renderView();
+    });
+  }
+
+  function confirmDelete(msg, onYes){
+    var body = '<p>'+esc(msg)+'</p>';
+    var foot = '<button class="btn btn-secondary btn-block" data-action="close-modal">Abbrechen</button>'+
+      '<button class="btn btn-destructive btn-block" id="confirmYes">Löschen</button>';
+    openModal("Wirklich löschen?", body, foot);
+    document.getElementById("confirmYes").addEventListener("click", function(){
+      onYes(); closeModal();
+    });
+  }
+
+  /* ============================ EVENT DELEGATION ============================ */
+  document.addEventListener("click", function(e){
+    var t = e.target.closest("[data-action]");
+    if(!t) return;
+    var action = t.getAttribute("data-action");
+    var id = t.getAttribute("data-id");
+
+    switch(action){
+      case "set-tab": setTab(t.getAttribute("data-tab")); break;
+      case "add-player": openPlayerModal(null); break;
+      case "edit-player": openPlayerModal(id); break;
+      case "delete-player":
+        var p = playerById(id);
+        if(!p) return;
+        confirmDelete('„'+fullName(p)+'“ und alle zugehörigen Punktestände in bestehenden Spieltagen werden entfernt.', function(){
+          state.players = state.players.filter(function(x){ return x.id !== id; });
+          state.matchdays.forEach(function(md){ md.entries = md.entries.filter(function(en){ return en.playerId !== id; }); });
+          save(); toast("Spieler gelöscht"); renderView();
+        });
+        break;
+      case "add-matchday": openMatchdayModal(null); break;
+      case "edit-matchday": openMatchdayModal(id); break;
+      case "delete-matchday":
+        confirmDelete("Dieser Spieltag wird endgültig gelöscht.", function(){
+          state.matchdays = state.matchdays.filter(function(x){ return x.id !== id; });
+          save(); toast("Spieltag gelöscht"); renderView();
+        });
+        break;
+      case "toggle-matchday":
+        if(ui.expandedMatchdays.has(id)) ui.expandedMatchdays.delete(id);
+        else ui.expandedMatchdays.add(id);
+        renderMatchdays();
+        break;
+      case "add-rule":
+        state.rules.items.push("");
+        save(); renderRules();
+        setTimeout(function(){
+          var tas = document.querySelectorAll(".rule-text");
+          if(tas.length) tas[tas.length-1].focus();
+        }, 0);
+        break;
+      case "remove-rule":
+        state.rules.items.splice(Number(t.getAttribute("data-index")), 1);
+        save(); toast("Regel entfernt"); renderRules();
+        break;
+      case "close-modal": closeModal(); break;
+    }
+  });
+
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Escape" && modalRoot.innerHTML) closeModal();
+  });
+
+  /* ============================ INIT ============================ */
+  renderTabbar();
+  renderView();
+})();
+</script>
+</body>
+</html>
