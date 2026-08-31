@@ -220,9 +220,15 @@
   .avatar{
     width:42px; height:42px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center;
     color:#fff; font-weight:700; font-size:.86rem; letter-spacing:.02em; box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);
+    background-size:cover; background-position:center; background-repeat:no-repeat;
   }
   .avatar.sm{ width:32px; height:32px; font-size:.72rem; }
   .avatar.lg{ width:64px; height:64px; font-size:1.15rem; }
+
+  .photo-picker{ display:flex; align-items:center; gap:14px; }
+  .photo-picker .avatar{ width:64px; height:64px; font-size:1.15rem; }
+  .photo-picker-actions{ display:flex; flex-direction:column; gap:8px; }
+  .photo-picker input[type=file]{ display:none; }
 
   /* ---------- podium / ranking ---------- */
   .podium{ display:flex; align-items:flex-end; gap:10px; margin-bottom:16px; }
@@ -440,10 +446,99 @@
 <div id="modalRoot"></div>
 <div class="toast" id="toast"></div>
 
-<!-- Geteilter Datenstand. Wird beim Speichern per Claude-Artifact-Publish neu
-     geschrieben, damit jede geöffnete Ansicht (jedes Gerät/jede Person) denselben
-     Stand sieht. Änderungen NIE hier von Hand eintragen. -->
+<!-- Einmalige Startdaten (vor der Firebase-Umstellung erfasst). Wird beim
+     ersten Start automatisch nach Firestore importiert, falls die Datenbank
+     noch leer ist – siehe maybeSeed() weiter unten. Änderungen NIE hier von
+     Hand eintragen, sondern über die App. -->
 <script id="app-state" type="application/json">{"players": [{"id": "7dab297d-a414-419f-9dca-547f3ac1ab55", "firstName": "Anette", "lastName": "G.", "color": "#FF3B30", "createdAt": "2026-08-30T19:58:17.067Z"}, {"id": "7b76ae6a-c3eb-4f7d-9e83-3f3c3d1b60f4", "firstName": "Christina", "lastName": "K.", "color": "#FF9500", "createdAt": "2026-08-30T19:59:37.826Z"}, {"id": "1a262e49-4dbb-41cf-a261-6cb12ae334db", "firstName": "Roland", "lastName": "G.", "color": "#00C7BE", "createdAt": "2026-08-30T20:00:28.089Z"}, {"id": "39aaf2bf-5ad7-4f83-81d0-3eebc8102c74", "firstName": "Uli", "lastName": "K.", "color": "#007AFF", "createdAt": "2026-08-30T20:01:14.580Z"}], "matchdays": [{"id": "0fcb0cdd-7d59-4e43-a556-303cb517a024", "dateTime": "2026-08-30T19:58:00.000Z", "note": "Morgat", "entries": [{"playerId": "7dab297d-a414-419f-9dca-547f3ac1ab55", "points": 6, "mauViolations": 0}, {"playerId": "7b76ae6a-c3eb-4f7d-9e83-3f3c3d1b60f4", "points": 9, "mauViolations": 0}, {"playerId": "1a262e49-4dbb-41cf-a261-6cb12ae334db", "points": 12, "mauViolations": 0}, {"playerId": "39aaf2bf-5ad7-4f83-81d0-3eebc8102c74", "points": 13, "mauViolations": 0}]}, {"id": "md-st2-morgat", "dateTime": "2026-08-31T19:00:00.000Z", "note": "Morgat", "entries": [{"playerId": "7dab297d-a414-419f-9dca-547f3ac1ab55", "points": 20, "mauViolations": 0}, {"playerId": "7b76ae6a-c3eb-4f7d-9e83-3f3c3d1b60f4", "points": 16, "mauViolations": 0}, {"playerId": "1a262e49-4dbb-41cf-a261-6cb12ae334db", "points": 14, "mauViolations": 0}, {"playerId": "39aaf2bf-5ad7-4f83-81d0-3eebc8102c74", "points": 21, "mauViolations": 0}]}, {"id": "md-st3-morgat", "dateTime": "2026-09-01T19:00:00.000Z", "note": "Morgat", "entries": [{"playerId": "7dab297d-a414-419f-9dca-547f3ac1ab55", "points": 23, "mauViolations": 0}, {"playerId": "7b76ae6a-c3eb-4f7d-9e83-3f3c3d1b60f4", "points": 18, "mauViolations": 0}, {"playerId": "1a262e49-4dbb-41cf-a261-6cb12ae334db", "points": 21, "mauViolations": 0}, {"playerId": "39aaf2bf-5ad7-4f83-81d0-3eebc8102c74", "points": 18, "mauViolations": 0}]}], "rules": {"name": "GriKlö", "scoring": "lower", "mauPenalty": 0, "items": ["Bube auf Bube auflegen ist grundsätzlich nicht erlaubt.", "Es ist immer eine passende Karte in der ausliegenden Farbe auszuspielen – oder ein weiteres Ass mit direkter Folgekarte in der Farbe. Andernfalls ist eine Karte zu ziehen.", "Auf eine Acht kann eine weitere Acht gelegt werden."]}}</script>
+
+<!-- Firebase-Anbindung (ES-Modul, getrennt vom Haupt-Script). Stellt window.FB
+     bereit: {available, ready, onPlayers, onMatchdays, onRules, addPlayer,
+     updatePlayer, deletePlayer, addMatchday, updateMatchday, deleteMatchday,
+     setRules, claimSeed}. Ohne gültige Konfiguration bleibt window.FB.available
+     false und die App läuft rein lokal weiter (siehe startFirebase() unten). -->
+<script type="module">
+(function(){
+  "use strict";
+  // TODO: Werte aus der Firebase-Konsole eintragen (Projekteinstellungen →
+  // "Meine Apps" → Web-App → SDK-Konfiguration). Cloud Firestore muss im
+  // Projekt aktiviert sein (Build → Firestore Database).
+  var firebaseConfig = {
+    apiKey: "REPLACE_ME",
+    authDomain: "REPLACE_ME.firebaseapp.com",
+    projectId: "REPLACE_ME",
+    storageBucket: "REPLACE_ME.appspot.com",
+    messagingSenderId: "REPLACE_ME",
+    appId: "REPLACE_ME"
+  };
+  var configured = firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("REPLACE_ME") === -1;
+
+  window.FB = { ready: false, available: false };
+
+  function finish(){
+    window.FB.ready = true;
+    document.dispatchEvent(new CustomEvent("fb-ready"));
+  }
+
+  if(!configured){
+    finish();
+    return;
+  }
+
+  Promise.all([
+    import("https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js")
+  ]).then(function(mods){
+    var appMod = mods[0], fs = mods[1];
+    try{
+      var app = appMod.initializeApp(firebaseConfig);
+      var db = fs.getFirestore(app);
+
+      function listCollection(name, cb){
+        return fs.onSnapshot(fs.collection(db, name), function(snap){
+          cb(snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); }));
+        }, function(err){ cb(null, err); });
+      }
+
+      window.FB.onPlayers = function(cb){ return listCollection("players", cb); };
+      window.FB.onMatchdays = function(cb){ return listCollection("matchdays", cb); };
+      window.FB.onRules = function(cb){
+        return fs.onSnapshot(fs.doc(db, "settings", "rules"), function(snap){
+          cb(snap.exists() ? snap.data() : null);
+        }, function(err){ cb(null, err); });
+      };
+
+      window.FB.addPlayer = function(data){ return fs.addDoc(fs.collection(db, "players"), data); };
+      window.FB.updatePlayer = function(id, data){ return fs.updateDoc(fs.doc(db, "players", id), data); };
+      window.FB.deletePlayer = function(id){ return fs.deleteDoc(fs.doc(db, "players", id)); };
+
+      window.FB.addMatchday = function(data){ return fs.addDoc(fs.collection(db, "matchdays"), data); };
+      window.FB.updateMatchday = function(id, data){ return fs.updateDoc(fs.doc(db, "matchdays", id), data); };
+      window.FB.deleteMatchday = function(id){ return fs.deleteDoc(fs.doc(db, "matchdays", id)); };
+
+      window.FB.setRules = function(data){ return fs.setDoc(fs.doc(db, "settings", "rules"), data, { merge: true }); };
+
+      // Verhindert doppeltes Importieren der Startdaten, falls mehrere
+      // Geräte gleichzeitig zum ersten Mal laden.
+      window.FB.claimSeed = function(){
+        var ref = fs.doc(db, "settings", "seeded");
+        return fs.getDoc(ref).then(function(snap){
+          if(snap.exists()) return false;
+          return fs.setDoc(ref, { at: new Date().toISOString() }).then(function(){ return true; });
+        });
+      };
+
+      window.FB.available = true;
+    }catch(e){
+      window.FB.available = false;
+    }
+    finish();
+  }).catch(function(){
+    window.FB.available = false;
+    finish();
+  });
+})();
+</script>
 
 <script>
 (function(){
@@ -499,55 +594,17 @@
     };
   }
 
-  var state = load();
-  function load(){
-    // Geteilter Stand kommt aus dem #app-state-Marker (von Claude beim
-    // Publish neu geschrieben). localStorage ist nur ein Offline-Fallback,
-    // falls die Seite außerhalb von claude.ai geöffnet wird.
-    var d = defaultState();
-    try{
-      var el = document.getElementById("app-state");
-      if(el && el.textContent.trim()){
-        var parsed = JSON.parse(el.textContent);
-        return {
-          players: Array.isArray(parsed.players) ? parsed.players : [],
-          matchdays: Array.isArray(parsed.matchdays) ? parsed.matchdays : [],
-          rules: Object.assign({}, d.rules, parsed.rules || {})
-        };
-      }
-    }catch(e){}
-    try{
-      var raw = localStorage.getItem(STORAGE_KEY);
-      if(raw){
-        var p2 = JSON.parse(raw);
-        return {
-          players: Array.isArray(p2.players) ? p2.players : [],
-          matchdays: Array.isArray(p2.matchdays) ? p2.matchdays : [],
-          rules: Object.assign({}, d.rules, p2.rules || {})
-        };
-      }
-    }catch(e){}
-    return d;
-  }
-  function save(){
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){}
-    syncToRemote();
-  }
+  var state = defaultState();
+  var fbAvailable = false;
 
-  /* ============================ REMOTE SYNC (Claude Artifact) ============================
-     Geteilte Daten laufen über die "artifact"-Runtime-Capability dieser Seite:
-     jedes Speichern publiziert die komplette Seite neu (mit aktuellem Stand im
-     #app-state-Marker), jede geöffnete Ansicht bei allen Mitspielern lädt
-     automatisch die neue Version. Außerhalb von claude.ai (z. B. lokal als
-     Datei geöffnet) gibt es kein window.claude – dann bleibt es bei rein
-     lokaler Speicherung (localStorage), ohne Fehler. */
-  var artifactNS = null;
-  var artifactChecked = false;
-  var syncing = false;
-  var pendingSync = false;
-  var writeBlocked = false;
+  /* ============================ REMOTE SYNC (Firebase) ============================
+     Geteilte Daten laufen über Firestore (siehe das Firebase-Modul-Script
+     weiter oben, das window.FB bereitstellt). Drei Live-Listener (players, matchdays,
+     settings/rules) halten den lokalen `state` in Echtzeit synchron zu allen
+     offenen Geräten. Ohne gültige Firebase-Konfiguration bzw. ohne Internet
+     fällt die App automatisch auf rein lokales localStorage zurück (kein Fehler,
+     aber auch keine geteilten Daten). */
   var syncStatusTimer = null;
-
   function setSyncStatus(s){
     var el = document.getElementById("syncStatus");
     if(!el) return;
@@ -555,68 +612,96 @@
     el.className = "sync-dot sync-" + s;
     el.title = {
       idle: "Geteilte Daten – synchronisiert", syncing: "Synchronisiere…", ok: "Synchronisiert",
-      error: "Speichern fehlgeschlagen – nur lokal in diesem Browser", readonly: "Nur Lesezugriff auf die geteilten Daten",
-      offline: "Nur lokal in diesem Browser gespeichert (keine geteilten Daten verfügbar)"
+      error: "Fehler bei den geteilten Daten", offline: "Nur lokal in diesem Browser gespeichert (keine geteilten Daten verfügbar)"
     }[s] || "Geteilte Daten";
     if(s === "ok") syncStatusTimer = setTimeout(function(){ setSyncStatus("idle"); }, 2500);
   }
 
-  async function initArtifact(){
+  function cacheLocal(){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify({ players: state.players, matchdays: state.matchdays, rules: state.rules })); }catch(e){}
+  }
+  function loadLocalFallback(){
+    var d = defaultState();
     try{
-      artifactNS = (window.claude && typeof window.claude.use === "function")
-        ? await window.claude.use("artifact")
-        : null;
-    }catch(e){ artifactNS = null; }
-    artifactChecked = true;
-    setSyncStatus(artifactNS ? "idle" : "offline");
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){
+        var p = JSON.parse(raw);
+        state.players = Array.isArray(p.players) ? p.players : [];
+        state.matchdays = Array.isArray(p.matchdays) ? p.matchdays : [];
+        state.rules = Object.assign({}, d.rules, p.rules || {});
+      }
+    }catch(e){}
+    renderTabbar(); renderView();
+  }
+  async function saveRules(){
+    try{
+      if(fbAvailable){ await window.FB.setRules(state.rules); }
+      else { cacheLocal(); }
+    }catch(e){ toast("Speichern fehlgeschlagen"); }
   }
 
-  async function buildPublishHtml(){
-    var res = await fetch(location.href, { cache: "no-store" });
-    if(!res.ok) throw new Error("Quelle konnte nicht geladen werden (" + res.status + ")");
-    var src = await res.text();
-    var json = JSON.stringify({ players: state.players, matchdays: state.matchdays, rules: state.rules });
-    var re = /(<script id="app-state" type="application\/json">)([\s\S]*?)(<\/script>)/;
-    if(!re.test(src)) throw new Error("app-state Marker nicht gefunden");
-    return src.replace(re, function(_, a, b, c){ return a + json + c; });
+  // Einmaliger Import der Daten, die vor der Firebase-Umstellung bereits im
+  // #app-state-Marker steckten (z. B. der "Morgat"-Spielstand) – läuft nur,
+  // wenn die Firestore-Datenbank noch komplett leer ist.
+  var seedAttempted = false;
+  function readSeedState(){
+    try{
+      var el = document.getElementById("app-state");
+      if(el && el.textContent.trim()) return JSON.parse(el.textContent);
+    }catch(e){}
+    return null;
+  }
+  async function maybeSeed(){
+    if(seedAttempted || !fbAvailable) return;
+    if(state.players.length || state.matchdays.length) return;
+    var seed = readSeedState();
+    if(!seed || !Array.isArray(seed.players) || !seed.players.length) return;
+    seedAttempted = true;
+    try{
+      var claimed = await window.FB.claimSeed();
+      if(!claimed) return;
+      var idMap = {};
+      for(var i=0;i<seed.players.length;i++){
+        var p = seed.players[i];
+        var ref = await window.FB.addPlayer({ firstName: p.firstName, lastName: p.lastName||"", color: p.color, photoURL: p.photoURL||null, createdAt: p.createdAt || new Date().toISOString() });
+        idMap[p.id] = ref.id;
+      }
+      var mds = seed.matchdays || [];
+      for(var j=0;j<mds.length;j++){
+        var md = mds[j];
+        var entries = md.entries.map(function(en){ return { playerId: idMap[en.playerId] || en.playerId, points: en.points, mauViolations: en.mauViolations||0 }; });
+        await window.FB.addMatchday({ dateTime: md.dateTime, note: md.note||"", entries: entries });
+      }
+      if(seed.rules) await window.FB.setRules(Object.assign({}, defaultState().rules, seed.rules));
+      toast("Bestehende Daten importiert");
+    }catch(e){ /* still empty next time – harmless */ }
   }
 
-  function syncToRemote(){
-    if(!artifactChecked || !artifactNS || writeBlocked) return;
-    pendingSync = true;
-    if(syncing) return;
-    runSync();
-  }
-  async function runSync(){
-    syncing = true;
-    setSyncStatus("syncing");
-    try{
-      while(pendingSync){
-        pendingSync = false;
-        var html = await buildPublishHtml();
-        await artifactNS.publish(html); // Erfolg: diese Ansicht lädt automatisch neu
-      }
-      setSyncStatus("ok");
-    }catch(err){
-      var code = err && err.code;
-      if(code === "conflict"){
-        // Eine neuere Version wurde bereits publiziert – die Ansicht lädt
-        // automatisch dorthin neu, hier ist nichts weiter zu tun.
-        setSyncStatus("idle");
-      } else if(code === "not_writer" || code === "not_granted" || code === "consent_required"){
-        writeBlocked = true;
-        setSyncStatus("readonly");
-        toast("Nur Lesezugriff – Änderungen werden hier nicht gespeichert");
-      } else if(code === "not_declared" || code === "capability_disabled" || code === "capability_removed"){
-        artifactNS = null;
-        setSyncStatus("offline");
-      } else {
-        setSyncStatus("error");
-        toast("Speichern fehlgeschlagen" + (code ? " (" + code + ")" : "") + " – nur lokal gespeichert");
-      }
-    }finally{
-      syncing = false;
+  function startFirebase(){
+    function go(){
+      fbAvailable = !!(window.FB && window.FB.available);
+      if(!fbAvailable){ setSyncStatus("offline"); loadLocalFallback(); return; }
+      setSyncStatus("syncing");
+      window.FB.onPlayers(function(players, err){
+        if(err){ setSyncStatus("error"); return; }
+        state.players = players; cacheLocal(); renderView(); setSyncStatus("ok");
+        maybeSeed();
+      });
+      window.FB.onMatchdays(function(matchdays, err){
+        if(err){ setSyncStatus("error"); return; }
+        state.matchdays = matchdays; cacheLocal(); renderView(); setSyncStatus("ok");
+        maybeSeed();
+      });
+      window.FB.onRules(function(rules, err){
+        if(err) return;
+        var d = defaultState();
+        state.rules = rules ? Object.assign({}, d.rules, rules) : d.rules;
+        cacheLocal(); renderView(); setSyncStatus("ok");
+        if(!rules) window.FB.setRules(state.rules).catch(function(){}); // Regel-Dokument einmalig anlegen
+      });
     }
+    if(window.FB && window.FB.ready) go();
+    else document.addEventListener("fb-ready", go, { once: true });
   }
 
   var ui = {
@@ -666,6 +751,13 @@
     return (a+b).toUpperCase() || "?";
   }
   function fullName(p){ return ((p.firstName||"")+" "+(p.lastName||"")).trim() || "Unbenannt"; }
+  function avatarHtml(p, sizeClass){
+    var cls = "avatar" + (sizeClass ? " " + sizeClass : "");
+    if(p.photoURL){
+      return '<div class="'+cls+'" style="background-image:url(\''+p.photoURL+'\')" title="'+esc(fullName(p))+'"></div>';
+    }
+    return '<div class="'+cls+'" style="background:'+p.color+'">'+esc(initials(p))+'</div>';
+  }
   function playerById(id){ return state.players.find(function(p){ return p.id === id; }); }
   function nextColor(){ return PALETTE[state.players.length % PALETTE.length]; }
 
@@ -795,7 +887,7 @@
           var rank = idx+1;
           html += '<div class="podium-slot rank-'+rank+'">'+
             (rank===1 ? '<div class="crown">'+ICONS.crown+'</div>' : '<div style="height:22px"></div>') +
-            '<div class="avatar" style="background:'+r.player.color+'">'+esc(initials(r.player))+'</div>'+
+            avatarHtml(r.player) +
             '<div class="podium-name">'+esc(fullName(r.player))+'</div>'+
             '<div class="podium-score">'+r.total+' Pkt.</div>'+
             '<div class="podium-bar"><span class="podium-rank">'+rank+'</span></div>'+
@@ -808,7 +900,7 @@
       played.forEach(function(r, i){
         html += '<div class="rank-row">'+
           '<div class="rank-num">'+(i+1)+'</div>'+
-          '<div class="avatar sm" style="background:'+r.player.color+'">'+esc(initials(r.player))+'</div>'+
+          avatarHtml(r.player, "sm") +
           '<div class="rank-info">'+
             '<div class="name">'+esc(fullName(r.player))+'</div>'+
             '<div class="meta">'+r.matchdays+' Spieltag(e) · Ø '+round1(r.avg)+' Pkt.'+(r.wins?' · '+r.wins+'× Sieg':'')+(r.mau?' · '+r.mau+' Mau-Verstoß(e)':'')+'</div>'+
@@ -825,7 +917,7 @@
       unplayed.forEach(function(r){
         html += '<div class="rank-row">'+
           '<div class="rank-num">–</div>'+
-          '<div class="avatar sm" style="background:'+r.player.color+'">'+esc(initials(r.player))+'</div>'+
+          avatarHtml(r.player, "sm") +
           '<div class="rank-info"><div class="name">'+esc(fullName(r.player))+'</div></div>'+
         '</div>';
       });
@@ -862,7 +954,7 @@
         var r = byId[p.id];
         html += '<div class="player-card">'+
           '<div class="player-card-top">'+
-            '<div class="avatar lg" style="background:'+p.color+'">'+esc(initials(p))+'</div>'+
+            avatarHtml(p, "lg") +
             '<div><div class="name">'+esc(fullName(p))+'</div><div class="sub">seit '+ (p.createdAt ? new Date(p.createdAt).toLocaleDateString("de-DE") : "–") +'</div></div>'+
           '</div>'+
           '<div class="player-stats">'+
@@ -923,7 +1015,7 @@
               var p = playerById(e.playerId);
               if(!p) return;
               var isWinner = winners.indexOf(e.playerId) !== -1;
-              html += '<tr><td><div class="md-player"><div class="avatar sm" style="background:'+p.color+'">'+esc(initials(p))+'</div>'+esc(fullName(p))+'</div></td>'+
+              html += '<tr><td><div class="md-player">'+avatarHtml(p, "sm")+esc(fullName(p))+'</div></td>'+
                 '<td><strong>'+e.points+'</strong></td>'+
                 '<td>'+(e.mauViolations ? e.mauViolations : '–')+'</td>'+
                 '<td>'+(isWinner ? '<span class="chip win">'+ICONS.crown+'Sieg</span>' : '')+'</td>'+
@@ -1056,25 +1148,26 @@
 
     document.getElementById("view").innerHTML = html;
 
-    document.getElementById("ruleName").addEventListener("input", debounce(function(e){
+    document.getElementById("ruleName").addEventListener("input", debounce(async function(e){
       state.rules.name = e.target.value.trim() || "Eigenes Regelwerk";
-      save(); document.getElementById("rulesetTag").textContent = "Regelwerk „"+state.rules.name+"“"; toast("Gespeichert");
+      document.getElementById("rulesetTag").textContent = "Regelwerk „"+state.rules.name+"“";
+      await saveRules(); toast("Gespeichert");
     }, 500));
-    document.getElementById("mauPenalty").addEventListener("input", debounce(function(e){
+    document.getElementById("mauPenalty").addEventListener("input", debounce(async function(e){
       state.rules.mauPenalty = Number(e.target.value) || 0;
-      save(); toast("Gespeichert");
+      await saveRules(); toast("Gespeichert");
     }, 500));
     document.querySelectorAll("#scoringSeg button").forEach(function(btn){
-      btn.addEventListener("click", function(){
+      btn.addEventListener("click", async function(){
         state.rules.scoring = btn.getAttribute("data-val");
-        save(); toast("Gespeichert"); renderRules();
+        await saveRules(); toast("Gespeichert"); renderRules();
       });
     });
     document.querySelectorAll(".rule-text").forEach(function(ta){
-      ta.addEventListener("input", debounce(function(){
+      ta.addEventListener("input", debounce(async function(){
         var i = Number(ta.getAttribute("data-index"));
         state.rules.items[i] = ta.value;
-        save(); toast("Gespeichert");
+        await saveRules(); toast("Gespeichert");
       }, 500));
     });
   }
@@ -1114,10 +1207,45 @@
   }
   function closeModal(){ modalRoot.innerHTML = ""; }
 
+  function downscaleImage(file, maxSize, quality){
+    return new Promise(function(resolve, reject){
+      if(!/^image\//.test(file.type)){ reject(new Error("Keine Bilddatei")); return; }
+      var reader = new FileReader();
+      reader.onerror = function(){ reject(new Error("Datei konnte nicht gelesen werden")); };
+      reader.onload = function(){
+        var img = new Image();
+        img.onerror = function(){ reject(new Error("Bild konnte nicht geladen werden")); };
+        img.onload = function(){
+          var side = Math.min(img.width, img.height);
+          var sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+          var size = Math.min(maxSize, side);
+          var canvas = document.createElement("canvas");
+          canvas.width = size; canvas.height = size;
+          var ctx = canvas.getContext("2d");
+          ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   function openPlayerModal(playerId){
     var editing = playerId ? playerById(playerId) : null;
     var color = editing ? editing.color : nextColor();
+    var photo = { value: editing ? (editing.photoURL || null) : null, changed: false };
     var body = '<form id="playerForm">'+
+      '<div class="field"><label>Foto (optional)</label>'+
+        '<div class="photo-picker">'+
+          '<div id="photoPreview">'+avatarHtml(editing ? editing : { firstName:"", lastName:"", color:color }, "")+'</div>'+
+          '<div class="photo-picker-actions">'+
+            '<label class="btn btn-secondary btn-sm" for="pPhotoInput">Foto wählen</label>'+
+            '<input type="file" id="pPhotoInput" accept="image/*" />'+
+            (photo.value ? '<button type="button" class="btn btn-destructive btn-sm" id="pPhotoRemove">Foto entfernen</button>' : '') +
+          '</div>'+
+        '</div>'+
+      '</div>'+
       '<div class="field-row">'+
         '<div class="field"><label>Vorname</label><input type="text" id="pFirst" required value="'+esc(editing?editing.firstName:"")+'" placeholder="Vorname" /></div>'+
         '<div class="field"><label>Nachname</label><input type="text" id="pLast" required value="'+esc(editing?editing.lastName:"")+'" placeholder="Nachname" /></div>'+
@@ -1130,27 +1258,60 @@
       '<button class="btn btn-primary btn-block" id="playerSubmit">'+(editing?"Speichern":"Anlegen")+'</button>';
     openModal(editing ? "Spieler bearbeiten" : "Neuer Spieler", body, foot);
 
+    function refreshPreview(){
+      var previewPlayer = { firstName: document.getElementById("pFirst").value, lastName: document.getElementById("pLast").value, color: document.getElementById("pColor").value, photoURL: photo.value };
+      document.getElementById("photoPreview").innerHTML = avatarHtml(previewPlayer, "");
+    }
+
     document.querySelectorAll("#swatches .swatch").forEach(function(sw){
       sw.addEventListener("click", function(){
         document.querySelectorAll("#swatches .swatch").forEach(function(s){ s.classList.remove("selected"); });
         sw.classList.add("selected");
         document.getElementById("pColor").value = sw.getAttribute("data-color");
+        refreshPreview();
       });
     });
 
-    document.getElementById("playerSubmit").addEventListener("click", function(){
+    document.getElementById("pPhotoInput").addEventListener("change", function(e){
+      var file = e.target.files && e.target.files[0];
+      if(!file) return;
+      downscaleImage(file, 240, .72).then(function(dataUri){
+        if(dataUri.length > 900000){ toast("Foto ist zu groß/komplex – bitte ein anderes wählen"); return; }
+        photo.value = dataUri; photo.changed = true;
+        refreshPreview();
+      }).catch(function(){
+        toast("Foto konnte nicht gelesen werden");
+      });
+    });
+    var removeBtn = document.getElementById("pPhotoRemove");
+    if(removeBtn) removeBtn.addEventListener("click", function(){
+      photo.value = null; photo.changed = true;
+      refreshPreview();
+    });
+
+    document.getElementById("playerSubmit").addEventListener("click", async function(){
       var first = document.getElementById("pFirst").value.trim();
       var last = document.getElementById("pLast").value.trim();
       if(!first || !last){ toast("Bitte Vor- und Nachname angeben"); return; }
       var col = document.getElementById("pColor").value;
-      if(editing){
-        editing.firstName = first; editing.lastName = last; editing.color = col;
-        toast("Spieler aktualisiert");
-      } else {
-        state.players.push({ id: uid(), firstName: first, lastName: last, color: col, createdAt: new Date().toISOString() });
-        toast("Spieler angelegt");
+      var payload = { firstName: first, lastName: last, color: col };
+      if(photo.changed) payload.photoURL = photo.value; // null = entfernt, sonst neue Daten-URI
+      try{
+        if(editing){
+          if(fbAvailable){ await window.FB.updatePlayer(editing.id, payload); }
+          else { Object.assign(editing, payload); cacheLocal(); }
+          toast("Spieler aktualisiert");
+        } else {
+          payload.createdAt = new Date().toISOString();
+          if(fbAvailable){ await window.FB.addPlayer(payload); }
+          else { state.players.push(Object.assign({ id: uid() }, payload)); cacheLocal(); }
+          toast("Spieler angelegt");
+        }
+        closeModal();
+        if(!fbAvailable) renderView();
+      }catch(e){
+        toast("Speichern fehlgeschlagen");
       }
-      save(); closeModal(); renderView();
     });
   }
 
@@ -1169,7 +1330,7 @@
       return '<div class="participant-row'+(included?"":" off")+'" data-player="'+p.id+'" style="--row-color:'+p.color+'">'+
         '<div class="who">'+
           '<button type="button" class="toggle-in'+(included?" on":"")+'" data-action="toggle-participant" data-id="'+p.id+'" title="Nimmt an diesem Spieltag teil" aria-label="Teilnahme von '+esc(fullName(p))+'">'+(included?ICONS.check:'')+'</button>'+
-          '<div class="avatar sm" style="background:'+p.color+'">'+esc(initials(p))+'</div>'+
+          avatarHtml(p, "sm") +
           '<div class="name">'+esc(fullName(p))+'</div>'+
           '<div class="not-in-badge" id="notin-'+p.id+'">'+(included?'':'nimmt nicht teil')+'</div>'+
         '</div>'+
@@ -1227,7 +1388,7 @@
       });
     });
 
-    document.getElementById("mdSubmit").addEventListener("click", function(){
+    document.getElementById("mdSubmit").addEventListener("click", async function(){
       var d = document.getElementById("mdDate").value;
       var t = document.getElementById("mdTime").value;
       if(!d || !t){ toast("Bitte Datum und Uhrzeit angeben"); return; }
@@ -1243,14 +1404,22 @@
         entries.push({ playerId: p.id, points: pts, mauViolations: mau });
       });
       if(!entries.length){ toast("Mindestens ein teilnehmender Spieler nötig"); return; }
-      if(editing){
-        editing.dateTime = iso; editing.note = note; editing.entries = entries;
-        toast("Spieltag aktualisiert");
-      } else {
-        state.matchdays.push({ id: uid(), dateTime: iso, note: note, entries: entries });
-        toast("Spieltag erfasst");
+      var payload = { dateTime: iso, note: note, entries: entries };
+      try{
+        if(editing){
+          if(fbAvailable){ await window.FB.updateMatchday(editing.id, payload); }
+          else { Object.assign(editing, payload); cacheLocal(); }
+          toast("Spieltag aktualisiert");
+        } else {
+          if(fbAvailable){ await window.FB.addMatchday(payload); }
+          else { state.matchdays.push(Object.assign({ id: uid() }, payload)); cacheLocal(); }
+          toast("Spieltag erfasst");
+        }
+        closeModal();
+        if(!fbAvailable) renderView();
+      }catch(e){
+        toast("Speichern fehlgeschlagen");
       }
-      save(); closeModal(); renderView();
     });
   }
 
@@ -1265,7 +1434,7 @@
   }
 
   /* ============================ EVENT DELEGATION ============================ */
-  document.addEventListener("click", function(e){
+  document.addEventListener("click", async function(e){
     var t = e.target.closest("[data-action]");
     if(!t) return;
     var action = t.getAttribute("data-action");
@@ -1278,18 +1447,32 @@
       case "delete-player":
         var p = playerById(id);
         if(!p) return;
-        confirmDelete('„'+fullName(p)+'“ und alle zugehörigen Punktestände in bestehenden Spieltagen werden entfernt.', function(){
-          state.players = state.players.filter(function(x){ return x.id !== id; });
-          state.matchdays.forEach(function(md){ md.entries = md.entries.filter(function(en){ return en.playerId !== id; }); });
-          save(); toast("Spieler gelöscht"); renderView();
+        confirmDelete('„'+fullName(p)+'“ und alle zugehörigen Punktestände in bestehenden Spieltagen werden entfernt.', async function(){
+          var affected = state.matchdays.filter(function(md){ return md.entries.some(function(en){ return en.playerId === id; }); });
+          try{
+            if(fbAvailable){
+              await Promise.all(affected.map(function(md){
+                return window.FB.updateMatchday(md.id, { entries: md.entries.filter(function(en){ return en.playerId !== id; }) });
+              }));
+              await window.FB.deletePlayer(id);
+            } else {
+              state.players = state.players.filter(function(x){ return x.id !== id; });
+              state.matchdays.forEach(function(md){ md.entries = md.entries.filter(function(en){ return en.playerId !== id; }); });
+              cacheLocal(); renderView();
+            }
+            toast("Spieler gelöscht");
+          }catch(err){ toast("Löschen fehlgeschlagen"); }
         });
         break;
       case "add-matchday": openMatchdayModal(null); break;
       case "edit-matchday": openMatchdayModal(id); break;
       case "delete-matchday":
-        confirmDelete("Dieser Spieltag wird endgültig gelöscht.", function(){
-          state.matchdays = state.matchdays.filter(function(x){ return x.id !== id; });
-          save(); toast("Spieltag gelöscht"); renderView();
+        confirmDelete("Dieser Spieltag wird endgültig gelöscht.", async function(){
+          try{
+            if(fbAvailable){ await window.FB.deleteMatchday(id); }
+            else { state.matchdays = state.matchdays.filter(function(x){ return x.id !== id; }); cacheLocal(); renderView(); }
+            toast("Spieltag gelöscht");
+          }catch(err){ toast("Löschen fehlgeschlagen"); }
         });
         break;
       case "toggle-matchday":
@@ -1299,7 +1482,8 @@
         break;
       case "add-rule":
         state.rules.items.push("");
-        save(); renderRules();
+        await saveRules();
+        renderRules();
         setTimeout(function(){
           var tas = document.querySelectorAll(".rule-text");
           if(tas.length) tas[tas.length-1].focus();
@@ -1307,7 +1491,8 @@
         break;
       case "remove-rule":
         state.rules.items.splice(Number(t.getAttribute("data-index")), 1);
-        save(); toast("Regel entfernt"); renderRules();
+        await saveRules();
+        toast("Regel entfernt"); renderRules();
         break;
       case "close-modal": closeModal(); break;
     }
@@ -1320,7 +1505,7 @@
   /* ============================ INIT ============================ */
   renderTabbar();
   renderView();
-  initArtifact();
+  startFirebase();
 })();
 </script>
 </body>

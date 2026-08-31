@@ -3,21 +3,52 @@
 Eine browserbasierte Verwaltung für eure Mau-Mau-Spielrunden im modernen
 Apple-Look. Läuft komplett client-seitig (kein Server, kein Build).
 
-**Geteilte Daten über mehrere Geräte/Personen** gibt es nur in der
-Claude-Artifact-Version dieser App (dort synchronisiert jedes Speichern
-automatisch zu allen offenen Ansichten). Diese `index.html` hier – lokal
-geöffnet oder z. B. über GitHub Pages gehostet – speichert dagegen nur
-lokal im jeweiligen Browser (`localStorage`); mehrere Geräte sehen dabei
-**nicht** dieselben Daten. Die App erkennt selbst, ob sie innerhalb von
-claude.ai läuft, und schaltet den Sync-Teil automatisch an/aus.
+**Geteilte Daten über mehrere Geräte/Personen** laufen über eine Firebase-
+Cloud-Firestore-Datenbank (siehe „Firebase einrichten“ unten). Ist keine
+gültige Firebase-Konfiguration hinterlegt oder besteht keine
+Internetverbindung, fällt die App automatisch auf rein lokale Speicherung
+im jeweiligen Browser zurück (`localStorage`, ohne Fehlermeldung) – dann
+sehen unterschiedliche Geräte allerdings **nicht** dieselben Daten.
 
 `index.html` einfach im Browser öffnen, um loszulegen.
+
+## Firebase einrichten
+
+1. Firebase-Projekt anlegen (https://console.firebase.google.com) und darin
+   unter **Build → Firestore Database** eine Cloud-Firestore-Datenbank
+   erstellen (Startmodus reicht, Regeln siehe unten).
+2. Unter Projekteinstellungen → „Meine Apps“ eine **Web-App** registrieren,
+   die dabei angezeigte `firebaseConfig` in `index.html` im
+   `<script type="module">`-Block (Anfang der Datei) eintragen.
+3. Firestore-Sicherheitsregeln setzen (Firestore Database → Rules) – ohne
+   eigenes Login ist die Datenbank für jeden mit den Konfigurationswerten
+   less-secure offen, aber auf genau dieses Projekt begrenzt:
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /{document=**} {
+         allow read, write: if true;
+       }
+     }
+   }
+   ```
+4. Fertig – beim ersten Start mit gültiger Konfiguration importiert die App
+   automatisch eventuell schon lokal vorhandene Test-/Startdaten einmalig
+   in die Datenbank.
+
+Spielerfotos werden client-seitig auf ein kleines quadratisches JPEG
+verkleinert und direkt als Daten-URI im Firestore-Dokument gespeichert –
+dafür ist kein separater Firebase-Storage-Dienst (und kein Bezahltarif)
+nötig.
 
 ## Funktionen
 
 ### Spieler
 - Einzelspieler mit Vorname und Nachname anlegen, bearbeiten und löschen.
-- Automatische Avatar-Farbe (frei wählbar aus einer Apple-Systemfarben-Palette).
+- Optionales Profilfoto pro Spieler (Foto hochladen, wird automatisch
+  verkleinert/zugeschnitten) – ohne Foto zeigt der Avatar die Initialen in
+  einer frei wählbaren Farbe aus einer Apple-Systemfarben-Palette.
 
 ### Spieltage
 - Jeder Spieltag/jede Spielrunde wird mit **Datum und Uhrzeit** erfasst
@@ -65,9 +96,9 @@ claude.ai läuft, und schaltet den Sync-Teil automatisch an/aus.
   Abhängigkeiten (Schriftart: reiner Systemfont-Stack `-apple-system` /
   `SF Pro`, dadurch echtes Apple-Rendering auf macOS/iOS und sinnvolle
   Fallbacks auf anderen Systemen).
-- Zustand (Spieler, Spieltage, Regelwerk) wird zusätzlich in `localStorage`
-  gehalten und bleibt bei einem erneuten Besuch erhalten (Offline-Fallback,
-  bzw. einziger Speicherort außerhalb von claude.ai).
+- Geteilte Daten (Spieler, Spieltage, Regelwerk) liegen in Cloud Firestore
+  mit Echtzeit-Listenern – Änderungen erscheinen ohne Neuladen auf allen
+  offenen Geräten. `localStorage` dient nur als Offline-/Fallback-Cache.
 - Hell-/Dunkelmodus folgen automatisch der Systemeinstellung; über den
   Icon-Button oben rechts lässt sich auch manuell zwischen Hell, Dunkel und
   System umgeschaltet werden.
